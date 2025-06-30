@@ -1,6 +1,8 @@
 from flask import Blueprint, request, jsonify, current_app
 from src.models import Device, TelemetryData, db
 from src.middleware.auth import authenticate_device, validate_json_payload, rate_limit_device
+from src.middleware.monitoring import device_heartbeat_monitor, request_metrics_middleware
+from src.middleware.security import security_headers_middleware, input_sanitization_middleware
 from datetime import datetime, timezone
 import json
 
@@ -8,7 +10,11 @@ import json
 device_bp = Blueprint('devices', __name__, url_prefix='/api/v1/devices')
 
 @device_bp.route('/register', methods=['POST'])
+@security_headers_middleware()
+@request_metrics_middleware()
+@rate_limit_device(max_requests=10, window=300, per_device=False)  # 10 registrations per 5 minutes per IP
 @validate_json_payload(['name', 'device_type'])
+@input_sanitization_middleware()
 def register_device():
     """Register a new IoT device"""
     try:
@@ -54,7 +60,10 @@ def register_device():
         }), 500
 
 @device_bp.route('/status', methods=['GET'])
+@security_headers_middleware()
+@request_metrics_middleware()
 @authenticate_device
+@device_heartbeat_monitor()
 def get_device_status():
     """Get current device status"""
     try:
@@ -83,9 +92,13 @@ def get_device_status():
         }), 500
 
 @device_bp.route('/telemetry', methods=['POST'])
+@security_headers_middleware()
+@request_metrics_middleware()
 @authenticate_device
-@rate_limit_device(max_requests=100, window=60)
+@device_heartbeat_monitor()
+@rate_limit_device(max_requests=100, window=60)  # 100 telemetry submissions per minute
 @validate_json_payload(['data'])
+@input_sanitization_middleware()
 def submit_telemetry():
     """Submit telemetry data from device"""
     try:
@@ -213,7 +226,11 @@ def update_device_config():
         }), 500
 
 @device_bp.route('/heartbeat', methods=['POST'])
+@security_headers_middleware()
+@request_metrics_middleware()
 @authenticate_device
+@device_heartbeat_monitor()
+@rate_limit_device(max_requests=30, window=60)  # 30 heartbeats per minute
 def device_heartbeat():
     """Simple heartbeat endpoint to check device connectivity"""
     try:

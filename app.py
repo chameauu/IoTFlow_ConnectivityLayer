@@ -1,5 +1,6 @@
 import os
-from flask import Flask, jsonify
+import redis
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_migrate import Migrate
 from src.config.config import config
@@ -7,6 +8,8 @@ from src.models import db
 from src.routes.devices import device_bp
 from src.routes.admin import admin_bp
 from src.utils.logging import setup_logging
+from src.middleware.monitoring import HealthMonitor
+from src.middleware.security import comprehensive_error_handler, security_headers_middleware
 
 def create_app(config_name=None):
     """Application factory pattern"""
@@ -23,22 +26,56 @@ def create_app(config_name=None):
     
     # Initialize extensions
     db.init_app(app)
-    CORS(app, origins=["http://localhost:3000", "http://127.0.0.1:3000"])  # Allow frontend
+    
+    # Enhanced CORS configuration
+    CORS(app, 
+         origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+         allow_headers=["Content-Type", "Authorization", "X-API-Key"],
+         expose_headers=["X-Request-ID", "X-RateLimit-Limit", "X-RateLimit-Remaining"]
+    )
+    
     migrate = Migrate(app, db)
+    
+    # Initialize Redis client
+    try:
+        redis_client = redis.from_url(app.config['REDIS_URL'], decode_responses=True)
+        redis_client.ping()  # Test connection
+        app.redis_client = redis_client
+        app.logger.info("Redis connection established")
+    except Exception as e:
+        app.logger.warning(f"Redis connection failed: {str(e)}")
+        app.redis_client = None
+    
+    # Register error handlers
+    comprehensive_error_handler(app)
     
     # Register blueprints
     app.register_blueprint(device_bp)
     app.register_blueprint(admin_bp)
     
-    # Health check endpoint
+    # Enhanced health check endpoint
     @app.route('/health', methods=['GET'])
+    @security_headers_middleware()
     def health_check():
-        """Health check endpoint"""
-        return jsonify({
-            'status': 'healthy',
-            'message': 'IoT Connectivity Layer is running',
-            'version': '1.0.0'
-        }), 200
+        """Comprehensive health check endpoint"""
+        detailed = request.args.get('detailed', 'false').lower() == 'true'
+        
+        if detailed:
+            return jsonify(HealthMonitor.get_system_health())
+        else:
+            return jsonify({
+                'status': 'healthy',
+                'message': 'IoT Connectivity Layer is running',
+                'version': '1.0.0'
+            }), 200
+    
+    # Detailed system status endpoint
+    @app.route('/status', methods=['GET'])
+    @security_headers_middleware()
+    def system_status():
+        """Detailed system status and metrics"""
+        return jsonify(HealthMonitor.get_system_health())
     
     # Root endpoint
     @app.route('/', methods=['GET'])

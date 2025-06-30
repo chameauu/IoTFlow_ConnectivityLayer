@@ -47,25 +47,67 @@ def authenticate_device(f):
     
     return decorated_function
 
-def rate_limit_device(max_requests=60, window=60):
-    """Rate limiting decorator for device endpoints"""
+def rate_limit_device(max_requests=60, window=60, per_device=True):
+    """Advanced rate limiting decorator with Redis backend"""
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            if not hasattr(request, 'device'):
+            if not hasattr(request, 'device') and per_device:
                 return jsonify({'error': 'Authentication required'}), 401
             
-            device_id = request.device.id
+            # Determine rate limit key
+            if per_device and hasattr(request, 'device'):
+                limit_key = f"rate_limit:device:{request.device.id}"
+            else:
+                # Global rate limiting for registration endpoints
+                limit_key = f"rate_limit:global:{request.remote_addr}"
+            
             current_time = int(time.time())
-            window_start = current_time - window
+            window_key = f"{limit_key}:{current_time // window}"
             
-            # Simple in-memory rate limiting (in production, use Redis)
-            cache_key = f"rate_limit_{device_id}_{current_time // window}"
-            
-            # For now, we'll skip the actual rate limiting implementation
-            # In production, implement with Redis or similar
-            
-            return f(*args, **kwargs)
+            try:
+                # Try to get Redis connection from app config
+                if hasattr(current_app, 'redis_client'):
+                    redis_client = current_app.redis_client
+                    
+                    # Get current count
+                    current_count = redis_client.get(window_key)
+                    current_count = int(current_count) if current_count else 0
+                    
+                    if current_count >= max_requests:
+                        # Rate limit exceeded
+                        remaining_time = window - (current_time % window)
+                        return jsonify({
+                            'error': 'Rate limit exceeded',
+                            'message': f'Maximum {max_requests} requests per {window} seconds',
+                            'retry_after': remaining_time,
+                            'limit': max_requests,
+                            'window': window
+                        }), 429
+                    
+                    # Increment counter
+                    pipe = redis_client.pipeline()
+                    pipe.incr(window_key)
+                    pipe.expire(window_key, window)
+                    pipe.execute()
+                    
+                    # Add rate limit headers to response
+                    response = f(*args, **kwargs)
+                    if hasattr(response, 'headers'):
+                        response.headers['X-RateLimit-Limit'] = str(max_requests)
+                        response.headers['X-RateLimit-Remaining'] = str(max_requests - current_count - 1)
+                        response.headers['X-RateLimit-Reset'] = str(current_time + (window - (current_time % window)))
+                    
+                    return response
+                else:
+                    # Fallback: no rate limiting if Redis unavailable
+                    current_app.logger.warning("Redis not available for rate limiting")
+                    return f(*args, **kwargs)
+                    
+            except Exception as e:
+                # Log error but don't block request
+                current_app.logger.error(f"Rate limiting error: {str(e)}")
+                return f(*args, **kwargs)
         
         return decorated_function
     return decorator
