@@ -45,6 +45,10 @@ def setup_logging(app):
     
     return app.logger
 
+def get_logger(name):
+    """Get a logger instance for the given name"""
+    return logging.getLogger(name)
+
 def log_request(request, response_status=None, execution_time=None):
     """Log HTTP request details"""
     logger = logging.getLogger(__name__)

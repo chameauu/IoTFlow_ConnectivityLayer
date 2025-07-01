@@ -19,6 +19,9 @@ flask-cors = "^6.0.1"
 requests = "^2.32.4"
 psutil = "^7.0.0"
 redis = "^6.2.0"
+paho-mqtt = "^1.6.1"
+asyncio-mqtt = "^0.16.1"
+cryptography = "^41.0.4"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.2"

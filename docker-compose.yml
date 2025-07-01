@@ -3,7 +3,7 @@ version: "3.8"
 services:
   postgres:
     image: postgres:15
-    container_name: iotflow_postgres
+    container_name: iotflow_postgress
     environment:
       POSTGRES_DB: iotflow_db
       POSTGRES_USER: iotflow_user
@@ -35,6 +35,26 @@ services:
       timeout: 5s
       retries: 5
 
+  # MQTT Broker - Eclipse Mosquitto
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: iotflow_mosquitto
+    ports:
+      - "1883:1883"    # MQTT port
+      - "9001:9001"    # WebSocket port
+      - "8883:8883"    # MQTT SSL port
+    volumes:
+      - ./mqtt/config:/mosquitto/config
+      - ./mqtt/data:/mosquitto/data
+      - ./mqtt/logs:/mosquitto/log
+      - mosquitto_data:/mosquitto/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_pub -h localhost -t test -m 'health check' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   # Optional: pgAdmin for database management
   pgadmin:
     image: dpage/pgadmin4:latest
@@ -57,4 +77,6 @@ volumes:
   redis_data:
     driver: local
   pgadmin_data:
+    driver: local
+  mosquitto_data:
     driver: local

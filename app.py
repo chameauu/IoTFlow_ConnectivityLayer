@@ -7,9 +7,11 @@ from src.config.config import config
 from src.models import db
 from src.routes.devices import device_bp
 from src.routes.admin import admin_bp
+from src.routes.mqtt import mqtt_bp
 from src.utils.logging import setup_logging
 from src.middleware.monitoring import HealthMonitor
 from src.middleware.security import comprehensive_error_handler, security_headers_middleware
+from src.mqtt.client import create_mqtt_service
 
 def create_app(config_name=None):
     """Application factory pattern"""
@@ -53,6 +55,46 @@ def create_app(config_name=None):
     # Register blueprints
     app.register_blueprint(device_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(mqtt_bp)
+    
+    # Initialize MQTT service
+    try:
+        mqtt_service = create_mqtt_service(app.config.mqtt_config)
+        app.mqtt_service = mqtt_service
+        
+        # Connect to MQTT broker
+        if mqtt_service.connect():
+            app.logger.info("MQTT service initialized and connected successfully")
+            
+            # Add telemetry callback to store data in database
+            def handle_telemetry_data(telemetry_data):
+                """Handle incoming telemetry data"""
+                try:
+                    # TODO: Store telemetry data in database
+                    # This would integrate with your existing device models
+                    app.logger.debug(f"Received telemetry: {telemetry_data}")
+                except Exception as e:
+                    app.logger.error(f"Error processing telemetry: {e}")
+            
+            # Add status callback to update device status
+            def handle_device_status(status_data):
+                """Handle device status updates"""
+                try:
+                    # TODO: Update device status in database
+                    app.logger.debug(f"Device status update: {status_data}")
+                except Exception as e:
+                    app.logger.error(f"Error processing device status: {e}")
+            
+            # Register callbacks
+            mqtt_service.add_telemetry_callback(handle_telemetry_data)
+            mqtt_service.add_status_callback(handle_device_status)
+            
+        else:
+            app.logger.warning("Failed to connect to MQTT broker")
+            
+    except Exception as e:
+        app.logger.error(f"Failed to initialize MQTT service: {str(e)}")
+        app.mqtt_service = None
     
     # Enhanced health check endpoint
     @app.route('/health', methods=['GET'])
@@ -88,7 +130,8 @@ def create_app(config_name=None):
             'endpoints': {
                 'health': '/health',
                 'devices': '/api/v1/devices',
-                'admin': '/api/v1/admin'
+                'admin': '/api/v1/admin',
+                'mqtt': '/api/v1/mqtt'
             },
             'documentation': 'See README.md for API documentation'
         }), 200
