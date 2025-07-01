@@ -54,6 +54,15 @@ class Config:
     MQTT_MESSAGE_RETRY_SET = int(os.environ.get('MQTT_MESSAGE_RETRY_SET', 20))
     MQTT_DEFAULT_QOS = int(os.environ.get('MQTT_DEFAULT_QOS', 1))
     
+    # InfluxDB Configuration
+    INFLUXDB_URL = os.environ.get('INFLUXDB_URL', 'http://localhost:8086')
+    INFLUXDB_TOKEN = os.environ.get('INFLUXDB_TOKEN', 'your-token-here')
+    INFLUXDB_ORG = os.environ.get('INFLUXDB_ORG', 'iotflow')
+    INFLUXDB_BUCKET = os.environ.get('INFLUXDB_BUCKET', 'telemetry')
+    INFLUXDB_TIMEOUT = int(os.environ.get('INFLUXDB_TIMEOUT', 10000))  # milliseconds
+    INFLUXDB_BATCH_SIZE = int(os.environ.get('INFLUXDB_BATCH_SIZE', 5000))
+    INFLUXDB_FLUSH_INTERVAL = int(os.environ.get('INFLUXDB_FLUSH_INTERVAL', 10000))  # milliseconds
+    
     @property
     def mqtt_config(self):
         """Get MQTT configuration as dictionary"""
@@ -77,6 +86,19 @@ class Config:
             'max_inflight_messages': self.MQTT_MAX_INFLIGHT_MESSAGES,
             'message_retry_set': self.MQTT_MESSAGE_RETRY_SET,
             'default_qos': self.MQTT_DEFAULT_QOS
+        }
+    
+    @property
+    def influxdb_config(self):
+        """Get InfluxDB configuration as dictionary"""
+        return {
+            'url': self.INFLUXDB_URL,
+            'token': self.INFLUXDB_TOKEN,
+            'org': self.INFLUXDB_ORG,
+            'bucket': self.INFLUXDB_BUCKET,
+            'timeout': self.INFLUXDB_TIMEOUT,
+            'batch_size': self.INFLUXDB_BATCH_SIZE,
+            'flush_interval': self.INFLUXDB_FLUSH_INTERVAL
         }
 
 class DevelopmentConfig(Config):

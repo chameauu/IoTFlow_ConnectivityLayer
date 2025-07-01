@@ -154,10 +154,28 @@ class TelemetryMessageHandler(MQTTMessageHandler):
                 except Exception as e:
                     self.logger.error(f"Error in telemetry callback: {e}")
             
+            # Write to InfluxDB if available
+            self._write_to_influxdb(device_id, message.topic, payload_data)
+            
             self.logger.debug(f"Processed telemetry from device {device_id}: {subtopic}")
             
         except Exception as e:
             self.logger.error(f"Error processing telemetry message: {e}")
+    
+    def _write_to_influxdb(self, device_id: str, topic: str, payload: dict):
+        """Write telemetry data to InfluxDB"""
+        try:
+            from src.influxdb.client import get_influxdb_service
+            
+            influxdb_service = get_influxdb_service()
+            if influxdb_service and influxdb_service.is_connected():
+                success = influxdb_service.write_mqtt_telemetry(device_id, topic, payload)
+                if success:
+                    self.logger.debug(f"Written telemetry to InfluxDB for device {device_id}")
+                else:
+                    self.logger.warning(f"Failed to write telemetry to InfluxDB for device {device_id}")
+        except Exception as e:
+            self.logger.error(f"Error writing telemetry to InfluxDB: {e}")
 
 
 class CommandMessageHandler(MQTTMessageHandler):

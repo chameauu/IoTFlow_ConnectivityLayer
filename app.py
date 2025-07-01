@@ -8,10 +8,12 @@ from src.models import db
 from src.routes.devices import device_bp
 from src.routes.admin import admin_bp
 from src.routes.mqtt import mqtt_bp
+from src.routes.influxdb import influxdb_bp
 from src.utils.logging import setup_logging
 from src.middleware.monitoring import HealthMonitor
 from src.middleware.security import comprehensive_error_handler, security_headers_middleware
 from src.mqtt.client import create_mqtt_service
+from src.influxdb.client import init_influxdb_service
 
 def create_app(config_name=None):
     """Application factory pattern"""
@@ -56,6 +58,7 @@ def create_app(config_name=None):
     app.register_blueprint(device_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(mqtt_bp)
+    app.register_blueprint(influxdb_bp)
     
     # Initialize MQTT service
     try:
@@ -98,6 +101,22 @@ def create_app(config_name=None):
         app.logger.error(f"Failed to initialize MQTT service: {str(e)}")
         app.mqtt_service = None
     
+    # Initialize InfluxDB service
+    try:
+        config_obj = config[config_name or 'development']()
+        influxdb_service = init_influxdb_service(config_obj.influxdb_config)
+        app.influxdb_service = influxdb_service
+        
+        # Connect to InfluxDB
+        if influxdb_service.connect():
+            app.logger.info("InfluxDB service initialized and connected successfully")
+        else:
+            app.logger.warning("Failed to connect to InfluxDB")
+            
+    except Exception as e:
+        app.logger.error(f"Failed to initialize InfluxDB service: {str(e)}")
+        app.influxdb_service = None
+    
     # Enhanced health check endpoint
     @app.route('/health', methods=['GET'])
     @security_headers_middleware()
@@ -133,7 +152,8 @@ def create_app(config_name=None):
                 'health': '/health',
                 'devices': '/api/v1/devices',
                 'admin': '/api/v1/admin',
-                'mqtt': '/api/v1/mqtt'
+                'mqtt': '/api/v1/mqtt',
+                'influxdb': '/api/v1/influxdb'
             },
             'documentation': 'See README.md for API documentation'
         }), 200

@@ -125,6 +125,33 @@ def submit_telemetry():
         db.session.add(telemetry)
         db.session.commit()
         
+        # Also write to InfluxDB if available
+        try:
+            from src.influxdb.client import get_influxdb_service, TelemetryPoint
+            
+            influxdb_service = get_influxdb_service()
+            if influxdb_service and influxdb_service.is_connected():
+                # Create InfluxDB telemetry point
+                telemetry_point = TelemetryPoint(
+                    measurement=data.get('type', 'sensor'),
+                    device_id=str(device.id),
+                    timestamp=datetime.now(timezone.utc),
+                    fields=telemetry_payload,
+                    tags={
+                        'device_name': device.name,
+                        'device_type': device.device_type,
+                        'location': device.location or 'unknown'
+                    }
+                )
+                
+                success = influxdb_service.write_telemetry_point(telemetry_point)
+                if success:
+                    current_app.logger.debug(f"Telemetry written to InfluxDB for device {device.name}")
+                else:
+                    current_app.logger.warning(f"Failed to write telemetry to InfluxDB for device {device.name}")
+        except Exception as influx_error:
+            current_app.logger.error(f"InfluxDB write error: {influx_error}")
+        
         current_app.logger.info(
             f"Telemetry received from device {device.name} (ID: {device.id})"
         )
