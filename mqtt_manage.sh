@@ -76,7 +76,7 @@ setup_broker() {
     docker pull eclipse-mosquitto:2.0
     
     # Start the services
-    docker_compose up -d mosquitto
+    docker compose up -d mosquitto
     
     # Wait for broker to start
     sleep 5
@@ -253,21 +253,21 @@ broker_status() {
 # Stop MQTT broker
 stop_broker() {
     info "Stopping MQTT broker..."
-    docker_compose stop mosquitto
+    docker compose stop mosquitto
     log "MQTT broker stopped"
 }
 
 # Start MQTT broker
 start_broker() {
     info "Starting MQTT broker..."
-    docker_compose start mosquitto
+    docker compose start mosquitto
     log "MQTT broker started"
 }
 
 # Restart MQTT broker
 restart_broker() {
     info "Restarting MQTT broker..."
-    docker_compose restart mosquitto
+    docker compose restart mosquitto
     log "MQTT broker restarted"
 }
 

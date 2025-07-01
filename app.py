@@ -59,7 +59,9 @@ def create_app(config_name=None):
     
     # Initialize MQTT service
     try:
-        mqtt_service = create_mqtt_service(app.config.mqtt_config)
+        # Get MQTT config from the config object
+        config_obj = config[config_name or 'development']()
+        mqtt_service = create_mqtt_service(config_obj.mqtt_config)
         app.mqtt_service = mqtt_service
         
         # Connect to MQTT broker
