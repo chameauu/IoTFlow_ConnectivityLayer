@@ -10,32 +10,32 @@ Your IoT device simulators are ready! Here's how to use them:
 
 ```bash
 cd simulators
-python3 simulate.py --interactive
+poetry run python simulate.py --interactive
 ```
 
 ### **Option 2: Single Device Test**
 
 ```bash
 # Basic sensor device
-python3 basic_device_simulator.py --duration 120 --telemetry-interval 20
+poetry run python simulators/basic_device_simulator.py --duration 120 --telemetry-interval 20
 
 # Specific device types
-python3 device_types.py --device-type temperature --duration 120
-python3 device_types.py --device-type door_lock --duration 120
-python3 device_types.py --device-type camera --duration 120
+poetry run python simulators/device_types.py --device-type temperature --duration 120
+poetry run python simulators/device_types.py --device-type door_lock --duration 120
+poetry run python simulators/device_types.py --device-type camera --duration 120
 ```
 
 ### **Option 3: Fleet Simulation**
 
 ```bash
 # Home setup (9 devices)
-python3 fleet_simulator.py --preset home --duration 300
+poetry run python simulators/fleet_simulator.py --preset home --duration 300
 
 # Office setup (16 devices)
-python3 fleet_simulator.py --preset office --duration 300
+poetry run python simulators/fleet_simulator.py --preset office --duration 300
 
 # Custom fleet
-python3 fleet_simulator.py --preset custom --temperature-sensors 3 --cameras 2
+poetry run python simulators/fleet_simulator.py --preset custom --temperature-sensors 3 --cameras 2
 ```
 
 ## **Device Types Available**

@@ -3,6 +3,7 @@ from src.models import Device, TelemetryData, db
 from src.middleware.auth import authenticate_device, validate_json_payload, rate_limit_device
 from src.middleware.monitoring import device_heartbeat_monitor, request_metrics_middleware
 from src.middleware.security import security_headers_middleware, input_sanitization_middleware
+from src.services.influxdb import influx_service
 from datetime import datetime, timezone
 import json
 
@@ -113,26 +114,48 @@ def submit_telemetry():
                 'message': 'Telemetry data must be a JSON object'
             }), 400
         
-        # Create telemetry record
+        # Store in both SQLite (for compatibility) and InfluxDB (for time-series)
+        timestamp = datetime.now(timezone.utc)
+        
+        # Store in SQLite (existing functionality)
         telemetry = TelemetryData(
             device_id=device.id,
-            payload=telemetry_payload,
-            device_metadata=data.get('metadata', {}),
             data_type=data.get('type', 'sensor'),
-            timestamp=datetime.now(timezone.utc)
+            timestamp=timestamp
         )
+        
+        # Set JSON data using helper methods
+        telemetry.set_payload(telemetry_payload)
+        telemetry.set_metadata(data.get('metadata', {}))
         
         db.session.add(telemetry)
         db.session.commit()
         
+        # Store in InfluxDB for time-series analysis
+        influx_success = influx_service.write_telemetry_data(
+            device_id=str(device.id),
+            data=telemetry_payload,
+            device_type=device.device_type,
+            metadata=data.get('metadata', {}),
+            timestamp=timestamp
+        )
+        
+        # Update device last_seen
+        device.update_last_seen()
+        
         current_app.logger.info(
-            f"Telemetry received from device {device.name} (ID: {device.id})"
+            f"Telemetry received from device {device.name} (ID: {device.id}) - "
+            f"SQLite: ✓, InfluxDB: {'✓' if influx_success else '✗'}"
         )
         
         return jsonify({
             'message': 'Telemetry data received successfully',
             'telemetry_id': telemetry.id,
-            'timestamp': telemetry.timestamp.isoformat()
+            'device_id': device.id,
+            'device_name': device.name,
+            'timestamp': timestamp.isoformat(),
+            'stored_in_sqlite': True,
+            'stored_in_influxdb': influx_success
         }), 201
         
     except Exception as e:

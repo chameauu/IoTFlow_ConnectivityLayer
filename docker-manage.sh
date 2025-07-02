@@ -45,26 +45,35 @@ check_docker_compose() {
     log_info "Docker Compose is available"
 }
 
+# Check if Poetry is available
+check_poetry() {
+    if ! command -v poetry > /dev/null 2>&1; then
+        log_error "Poetry is not available. Please install Poetry first."
+        exit 1
+    fi
+    log_info "Poetry is available"
+}
+
 # Start services
 start_services() {
-    log_step "Starting PostgreSQL and Redis services..."
-    docker compose up -d postgres redis
+    log_step "Starting Redis, InfluxDB, and MQTT services..."
+    docker compose up -d redis influxdb mosquitto
     
     log_step "Waiting for services to be ready..."
     
-    # Wait for PostgreSQL
-    log_info "Waiting for PostgreSQL to be ready..."
+    # Wait for InfluxDB
+    log_info "Waiting for InfluxDB to be ready..."
     timeout=60
     counter=0
-    while ! docker compose exec postgres pg_isready -U iotflow_user -d iotflow_db > /dev/null 2>&1; do
+    while ! curl -s http://localhost:8086/health > /dev/null 2>&1; do
         if [ $counter -eq $timeout ]; then
-            log_error "PostgreSQL failed to start within $timeout seconds"
+            log_error "InfluxDB failed to start within $timeout seconds"
             exit 1
         fi
         sleep 1
         counter=$((counter + 1))
     done
-    log_info "PostgreSQL is ready"
+    log_info "InfluxDB is ready"
     
     # Wait for Redis
     log_info "Waiting for Redis to be ready..."
@@ -79,20 +88,55 @@ start_services() {
     done
     log_info "Redis is ready"
     
+    # Check MQTT broker
+    log_info "Checking MQTT broker..."
+    if docker compose ps mosquitto | grep -q "Up"; then
+        log_info "MQTT broker is running"
+    else
+        log_warn "MQTT broker may not be running properly"
+    fi
+    
     log_info "All services are ready!"
 }
 
-# Start all services including pgAdmin
+# Start all services
 start_all() {
-    log_step "Starting all services (PostgreSQL, Redis, pgAdmin)..."
+    log_step "Starting all services (Redis, InfluxDB, MQTT)..."
     docker compose up -d
     
     log_step "Waiting for services to be ready..."
     start_services
     
-    log_info "pgAdmin is available at: http://localhost:8080"
-    log_info "  Email: admin@iotflow.com"
-    log_info "  Password: admin123"
+    log_info "InfluxDB UI is available at: http://localhost:8086"
+    log_info "MQTT broker is running on port 1883 (TLS: 8883, WebSocket: 9001)"
+}
+
+# Initialize Python environment and database
+init_app() {
+    log_step "Initializing application..."
+    check_poetry
+    
+    log_info "Installing Python dependencies..."
+    poetry install
+    
+    log_info "Initializing SQLite database..."
+    poetry run python manage.py init-db
+    
+    log_info "Application initialized successfully!"
+}
+
+# Run the Flask application
+run_app() {
+    log_step "Starting Flask application..."
+    check_poetry
+    poetry run python manage.py run
+}
+
+# Run tests
+test_app() {
+    log_step "Running application tests..."
+    check_poetry
+    poetry run python manage.py test
 }
 
 # Stop services
@@ -121,29 +165,26 @@ logs() {
 
 # Reset data (dangerous!)
 reset_data() {
-    log_warn "This will delete ALL data in the database and Redis!"
+    log_warn "This will delete ALL data including SQLite database and Docker volumes!"
     read -p "Are you sure you want to continue? (y/N): " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         log_step "Stopping services..."
         docker compose down
         
-        log_step "Removing volumes..."
+        log_step "Removing Docker volumes..."
         docker compose down -v
-        docker volume rm connectivity_layer_postgres_data connectivity_layer_redis_data connectivity_layer_pgadmin_data 2>/dev/null || true
         
-        log_step "Starting services with fresh data..."
-        start_services
-        log_info "Data reset completed"
+        log_step "Removing SQLite database..."
+        rm -f iotflow.db
+        
+        log_step "Removing logs directory..."
+        rm -rf logs
+        
+        log_info "Data reset completed. Run 'init-app' to reinitialize."
     else
         log_info "Reset cancelled"
     fi
-}
-
-# Connect to PostgreSQL
-psql() {
-    log_step "Connecting to PostgreSQL..."
-    docker compose exec postgres psql -U iotflow_user -d iotflow_db
 }
 
 # Connect to Redis
@@ -152,15 +193,26 @@ redis_cli() {
     docker compose exec redis redis-cli
 }
 
-# Backup database
-backup() {
-    backup_file="backup_$(date +%Y%m%d_%H%M%S).sql"
-    log_step "Creating database backup: $backup_file"
-    docker compose exec postgres pg_dump -U iotflow_user -d iotflow_db > "$backup_file"
-    log_info "Backup created: $backup_file"
+# Connect to InfluxDB CLI
+influxdb_cli() {
+    log_step "Connecting to InfluxDB CLI..."
+    docker compose exec influxdb influx
 }
 
-# Restore database
+# Backup SQLite database
+backup() {
+    backup_file="backup_$(date +%Y%m%d_%H%M%S).db"
+    log_step "Creating SQLite database backup: $backup_file"
+    if [ -f "iotflow.db" ]; then
+        cp iotflow.db "$backup_file"
+        log_info "SQLite backup created: $backup_file"
+    else
+        log_error "SQLite database file not found. Run 'init-app' first."
+        exit 1
+    fi
+}
+
+# Restore SQLite database
 restore() {
     if [ -z "$2" ]; then
         log_error "Please provide backup file: $0 restore <backup_file>"
@@ -172,12 +224,12 @@ restore() {
         exit 1
     fi
     
-    log_warn "This will replace all data in the database!"
+    log_warn "This will replace the current SQLite database!"
     read -p "Are you sure you want to continue? (y/N): " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        log_step "Restoring database from: $2"
-        docker compose exec -T postgres psql -U iotflow_user -d iotflow_db < "$2"
+        log_step "Restoring SQLite database from: $2"
+        cp "$2" iotflow.db
         log_info "Database restored successfully"
     else
         log_info "Restore cancelled"
@@ -195,6 +247,17 @@ case "$1" in
         check_docker
         check_docker_compose
         start_all
+        ;;
+    "init-app")
+        check_docker
+        check_docker_compose
+        init_app
+        ;;
+    "run")
+        run_app
+        ;;
+    "test")
+        test_app
         ;;
     "stop")
         stop_services
@@ -214,11 +277,11 @@ case "$1" in
         check_docker_compose
         reset_data
         ;;
-    "psql")
-        psql
-        ;;
     "redis")
         redis_cli
+        ;;
+    "influxdb")
+        influxdb_cli
         ;;
     "backup")
         backup
@@ -228,26 +291,31 @@ case "$1" in
         ;;
     *)
         echo "IoT Connectivity Layer - Docker Management"
-        echo "Usage: $0 {start|start-all|stop|restart|status|logs|reset|psql|redis|backup|restore}"
+        echo "Usage: $0 {start|start-all|init-app|run|test|stop|restart|status|logs|reset|redis|influxdb|backup|restore}"
         echo ""
         echo "Commands:"
-        echo "  start      - Start PostgreSQL and Redis"
-        echo "  start-all  - Start all services including pgAdmin"
+        echo "  start      - Start Redis, InfluxDB, and MQTT services"
+        echo "  start-all  - Start all services"
+        echo "  init-app   - Initialize Python environment and SQLite database"
+        echo "  run        - Run Flask application (uses Poetry)"
+        echo "  test       - Run application tests (uses Poetry)"
         echo "  stop       - Stop all services"
         echo "  restart    - Restart services"
         echo "  status     - Show service status"
         echo "  logs       - Show logs (optionally for specific service)"
         echo "  reset      - Reset all data (DANGEROUS!)"
-        echo "  psql       - Connect to PostgreSQL"
         echo "  redis      - Connect to Redis CLI"
-        echo "  backup     - Create database backup"
-        echo "  restore    - Restore database from backup"
+        echo "  influxdb   - Connect to InfluxDB CLI"
+        echo "  backup     - Create SQLite database backup"
+        echo "  restore    - Restore SQLite database from backup"
         echo ""
         echo "Examples:"
-        echo "  $0 start"
-        echo "  $0 logs postgres"
-        echo "  $0 backup"
-        echo "  $0 restore backup_20250630_120000.sql"
+        echo "  $0 start-all          # Start all services"
+        echo "  $0 init-app           # Initialize app and database"
+        echo "  $0 run                # Run Flask app"
+        echo "  $0 logs influxdb      # Show InfluxDB logs"
+        echo "  $0 backup             # Backup SQLite database"
+        echo "  $0 restore backup_20250702_120000.db"
         exit 1
         ;;
 esac

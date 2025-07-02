@@ -9,6 +9,10 @@ import sys
 import time
 import requests
 import argparse
+import os
+
+# Get the project root directory
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def check_service_health(base_url="http://localhost:5000"):
     """Check if the IoT service is running"""
@@ -34,7 +38,7 @@ def run_single_device(device_type, name=None, duration=300, interval=30):
     
     if device_type == "basic":
         cmd = [
-            "python3", "basic_device_simulator.py",
+            "poetry", "run", "python", "simulators/basic_device_simulator.py",
             "--duration", str(duration),
             "--telemetry-interval", str(interval)
         ]
@@ -42,7 +46,7 @@ def run_single_device(device_type, name=None, duration=300, interval=30):
             cmd.extend(["--name", name])
     else:
         cmd = [
-            "python3", "device_types.py",
+            "poetry", "run", "python", "simulators/device_types.py",
             "--device-type", device_type,
             "--duration", str(duration),
             "--interval", str(interval)
@@ -51,7 +55,7 @@ def run_single_device(device_type, name=None, duration=300, interval=30):
             cmd.extend(["--name", name])
     
     try:
-        subprocess.run(cmd, cwd="simulators")
+        subprocess.run(cmd, cwd=PROJECT_ROOT, check=True)  # Run from project root to use Poetry
     except KeyboardInterrupt:
         print("\n🛑 Device simulation stopped")
     except Exception as e:
@@ -63,14 +67,14 @@ def run_fleet_simulation(preset="home", duration=600, telemetry_interval=60):
     print(f"   Duration: {duration} seconds ({duration//60} minutes)")
     
     cmd = [
-        "python3", "fleet_simulator.py",
+        "poetry", "run", "python", "simulators/fleet_simulator.py",
         "--preset", preset,
         "--duration", str(duration),
         "--telemetry-interval", str(telemetry_interval)
     ]
     
     try:
-        subprocess.run(cmd, cwd="simulators")
+        subprocess.run(cmd, cwd=PROJECT_ROOT, check=True)  # Run from project root to use Poetry
     except KeyboardInterrupt:
         print("\n🛑 Fleet simulation stopped")
     except Exception as e:
@@ -80,14 +84,14 @@ def run_custom_fleet(**device_counts):
     """Run custom fleet with specified device counts"""
     print("\n🚀 Starting custom fleet simulation")
     
-    cmd = ["python3", "fleet_simulator.py", "--preset", "custom"]
+    cmd = ["poetry", "run", "python", "simulators/fleet_simulator.py", "--preset", "custom"]
     
     for device_type, count in device_counts.items():
         if count > 0:
             cmd.extend([f"--{device_type.replace('_', '-')}", str(count)])
     
     try:
-        subprocess.run(cmd, cwd="simulators")
+        subprocess.run(cmd, cwd=PROJECT_ROOT, check=True)  # Run from project root to use Poetry
     except KeyboardInterrupt:
         print("\n🛑 Custom fleet simulation stopped")
     except Exception as e:

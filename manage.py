@@ -6,10 +6,11 @@ Usage:
     poetry run python manage.py <command>
     
 Commands:
-    init-db    - Initialize database with tables
-    create-device <name> - Create a new device
-    run        - Start the Flask development server
-    test       - Run tests
+    init-db               - Initialize SQLite database with tables
+    create-device <name>  - Create a new device and generate API key
+    run                   - Start the Flask development server
+    test                  - Run tests using pytest
+    shell                 - Start interactive Python shell with app context
 """
 import sys
 import os
@@ -53,8 +54,28 @@ def run_app():
     app.run(host='0.0.0.0', port=5000, debug=True)
 
 def run_tests():
-    """Run tests"""
-    os.system('poetry run pytest')
+    """Run tests using pytest"""
+    import subprocess
+    result = subprocess.run(['poetry', 'run', 'pytest', '-v'], capture_output=False)
+    return result.returncode
+
+def run_shell():
+    """Start interactive Python shell with app context"""
+    import code
+    app = create_app()
+    with app.app_context():
+        # Make common objects available in shell
+        from src.models import Device
+        from src.services.influxdb import InfluxDBService
+        
+        vars = {
+            'app': app,
+            'db': db,
+            'Device': Device,
+            'influxdb': InfluxDBService()
+        }
+        
+        code.interact(local=vars)
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
@@ -67,13 +88,15 @@ if __name__ == '__main__':
         init_db()
     elif command == 'create-device':
         if len(sys.argv) < 3:
-            print("Usage: python manage.py create-device <name>")
+            print("Usage: poetry run python manage.py create-device <name>")
             sys.exit(1)
         create_device(sys.argv[2])
     elif command == 'run':
         run_app()
     elif command == 'test':
-        run_tests()
+        sys.exit(run_tests())
+    elif command == 'shell':
+        run_shell()
     else:
         print(f"Unknown command: {command}")
         print(__doc__)

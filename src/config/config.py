@@ -7,13 +7,17 @@ load_dotenv()
 class Config:
     """Base configuration class"""
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key'
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-        f"postgresql://{os.environ.get('DB_USER')}:{os.environ.get('DB_PASSWORD')}@" \
-        f"{os.environ.get('DB_HOST')}:{os.environ.get('DB_PORT')}/{os.environ.get('DB_NAME')}"
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///iotflow.db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Redis Configuration
     REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+    
+    # InfluxDB Configuration
+    INFLUXDB_URL = os.environ.get('INFLUXDB_URL', 'http://localhost:8086')
+    INFLUXDB_TOKEN = os.environ.get('INFLUXDB_TOKEN', 'your-super-secret-token')
+    INFLUXDB_ORG = os.environ.get('INFLUXDB_ORG', 'iotflow')
+    INFLUXDB_BUCKET = os.environ.get('INFLUXDB_BUCKET', 'telemetry')
     
     # API Configuration
     API_VERSION = os.environ.get('API_VERSION', 'v1')

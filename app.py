@@ -8,6 +8,7 @@ from src.models import db
 from src.routes.devices import device_bp
 from src.routes.admin import admin_bp
 from src.routes.mqtt import mqtt_bp
+from src.routes.telemetry import telemetry_bp
 from src.utils.logging import setup_logging
 from src.middleware.monitoring import HealthMonitor
 from src.middleware.security import comprehensive_error_handler, security_headers_middleware
@@ -56,6 +57,7 @@ def create_app(config_name=None):
     app.register_blueprint(device_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(mqtt_bp)
+    app.register_blueprint(telemetry_bp)
     
     # Initialize MQTT service
     try:

@@ -1,25 +1,26 @@
 version: "3.8"
 
 services:
-  postgres:
-    image: postgres:15
-    container_name: iotflow_postgress
-    environment:
-      POSTGRES_DB: iotflow_db
-      POSTGRES_USER: iotflow_user
-      POSTGRES_PASSWORD: iotflow_password
-      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+  influxdb:
+    image: influxdb:2.7
+    container_name: iotflow_influxdb
     ports:
-      - "5432:5432"
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=password123
+      - DOCKER_INFLUXDB_INIT_ORG=iotflow
+      - DOCKER_INFLUXDB_INIT_BUCKET=telemetry
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=your-super-secret-token
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./database_setup.sql:/docker-entrypoint-initdb.d/01-setup.sql
+      - influxdb_data:/var/lib/influxdb2
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U iotflow_user -d iotflow_db"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD", "curl", "-f", "http://localhost:8086/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   redis:
     image: redis:7-alpine
@@ -55,28 +56,10 @@ services:
       timeout: 10s
       retries: 3
 
-  # Optional: pgAdmin for database management
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: iotflow_pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@iotflow.com
-      PGADMIN_DEFAULT_PASSWORD: admin123
-      PGADMIN_LISTEN_PORT: 80
-    ports:
-      - "8080:80"
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-    depends_on:
-      - postgres
-    restart: unless-stopped
-
 volumes:
-  postgres_data:
+  influxdb_data:
     driver: local
   redis_data:
-    driver: local
-  pgadmin_data:
     driver: local
   mosquitto_data:
     driver: local

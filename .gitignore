@@ -25,6 +25,8 @@ wheels/
 *.egg
 MANIFEST
 
+test/
+
 # Poetry
 poetry.lock
 

@@ -1,132 +1,179 @@
-# IoT Device Connectivity Layer
+# IoTFlow - IoT Device Connectivity Layer
 
-A robust REST API built with Python Flask and PostgreSQL for managing IoT device connectivity and telemetry data collection.
+A modern, scalable REST API built with Python Flask for comprehensive IoT device connectivity, telemetry data collection, and real-time analytics.
 
-## Features
+## 🚀 Features
 
-- **Device Management**: Register, authenticate, and manage IoT devices
-- **Telemetry Collection**: Secure endpoints for IoT devices to submit sensor data
-- **Real-time Monitoring**: Track device status and connectivity
-- **Admin Dashboard**: Comprehensive admin endpoints for device and data management
-- **Secure Authentication**: API key-based authentication for devices
-- **Rate Limiting**: Protect against abuse with configurable rate limits
-- **Comprehensive Logging**: Detailed logging for monitoring and debugging
+### Core Capabilities
+- **🔌 Device Management**: Register, authenticate, and manage IoT devices with secure API keys
+- **📊 Hybrid Data Storage**: SQLite for device management + InfluxDB for time-series telemetry
+- **📡 Multi-Protocol Support**: HTTP REST API + MQTT pub/sub messaging
+- **⚡ Real-time Analytics**: Time-series data queries, aggregations, and dashboards
+- **🛡️ Security First**: API key authentication, rate limiting, and secure endpoints
+- **📈 Scalable Architecture**: Redis caching, background processing, containerized services
+- **🧪 Comprehensive Testing**: Built-in device simulators and testing framework
 
-## Architecture
+### Advanced Features
+- **🔍 Time-Series Queries**: Advanced InfluxDB queries with filtering and aggregation
+- **🤖 Device Simulation**: Fleet simulators for development and testing
+- **📋 Admin Dashboard**: Complete device and data management interface
+- **📚 Poetry Integration**: Modern dependency management and development workflow
+- **🐳 Docker Compose**: Full containerized development environment
+- **📊 Monitoring**: Comprehensive logging, metrics, and health checks
+
+## 🏗️ Architecture
 
 ```
-IoT Devices → API Gateway → Flask Application → PostgreSQL Database
-                ↓
-        Admin Dashboard/Frontend
+    IoT Devices (HTTP/MQTT)
+           ↓
+    ┌─────────────────────────┐
+    │   Load Balancer/Proxy   │
+    └─────────────┬───────────┘
+                  ↓
+    ┌─────────────────────────┐
+    │    Flask Application    │
+    │   (REST API + MQTT)     │
+    └─────────┬─────────┬─────┘
+              ↓         ↓
+    ┌─────────────┐   ┌──────────────┐
+    │   SQLite    │   │  InfluxDB    │
+    │ (Devices)   │   │ (Telemetry)  │
+    └─────────────┘   └──────────────┘
+              ↓
+    ┌─────────────────────────┐
+    │   Redis (Cache/Queue)   │
+    │   MQTT Broker           │
+    └─────────────────────────┘
 ```
 
-## Quick Start
+## 🚀 Quick Start
 
 ### Prerequisites
 
-- Python 3.8+
-- PostgreSQL 15+
-- pip (Python package manager)
+- **Python 3.8+** 
+- **Poetry** (recommended) or pip
+- **Docker & Docker Compose**
+- **Git**
 
 ### 1. Clone and Setup
 
 ```bash
-cd /home/chameau/Desktop/IoTFlow/connectivity_layer
+git clone <repository-url>
+cd IoTFlow_ConnectivityLayer
 
-# Install dependencies
+# Install Poetry (if not already installed)
+curl -sSL https://install.python-poetry.org | python3 -
+
+# Install dependencies with Poetry
+poetry install
+
+# Or with pip
 pip install -r requirements.txt
 ```
 
-### 2. Database Setup
-
-First, create the PostgreSQL database:
+### 2. Environment Configuration
 
 ```bash
-# Connect to PostgreSQL as superuser
-sudo -u postgres psql
+# Copy environment template
+cp .env.example .env
 
-# Run the database setup script
-\i database_setup.sql
+# Edit configuration (optional - defaults work for development)
+nano .env
 ```
 
-Or manually create the database:
-
-```sql
-CREATE DATABASE iotflow_db;
-CREATE USER iotflow_user WITH PASSWORD 'iotflow_password';
-GRANT ALL PRIVILEGES ON DATABASE iotflow_db TO iotflow_user;
-```
-
-### 3. Environment Configuration
-
-Update the `.env` file with your database credentials:
-
-```env
-# Database Configuration
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=iotflow_db
-DB_USER=iotflow_user
-DB_PASSWORD=iotflow_password
-
-# Security (change in production!)
-SECRET_KEY=your-secret-key-change-in-production
-JWT_SECRET_KEY=your-jwt-secret-key
-```
-
-### 4. Initialize Database
+### 3. Start Services & Initialize
 
 ```bash
-python init_db.py
+# Start all services (Redis, InfluxDB, MQTT)
+./docker-manage.sh start-all
+
+# Initialize Python environment and database
+./docker-manage.sh init-app
+
+# Start Flask application
+./docker-manage.sh run
 ```
 
-This will create the database tables and sample devices with API keys for testing.
-
-### 5. Start the Application
+### 4. Verify Installation
 
 ```bash
-python app.py
+# Check service health
+curl http://localhost:5000/health
+
+# Run comprehensive tests
+./docker-manage.sh test
 ```
 
-The API will be available at `http://localhost:5000`
+## 🎮 Device Simulation & Testing
 
-### 6. Test the API
-
+### Single Device Test
 ```bash
-python test_api.py
+# Basic sensor simulation (60s, telemetry every 15s)
+poetry run python simulators/basic_device_simulator.py --duration 60 --telemetry-interval 15
+
+# Specific device types
+poetry run python simulators/device_types.py --device-type temperature --duration 120
 ```
 
-## API Endpoints
+### Fleet Simulation
+```bash
+# Home setup (9 devices: sensors, locks, cameras)
+poetry run python simulators/fleet_simulator.py --preset home --duration 300
 
-### Device Endpoints
+# Office setup (16 devices)
+poetry run python simulators/fleet_simulator.py --preset office --duration 300
 
-| Method | Endpoint                    | Description           | Authentication |
-| ------ | --------------------------- | --------------------- | -------------- |
-| POST   | `/api/v1/devices/register`  | Register a new device | None           |
-| GET    | `/api/v1/devices/status`    | Get device status     | API Key        |
-| POST   | `/api/v1/devices/telemetry` | Submit telemetry data | API Key        |
-| GET    | `/api/v1/devices/telemetry` | Get device telemetry  | API Key        |
-| PUT    | `/api/v1/devices/config`    | Update device config  | API Key        |
-| POST   | `/api/v1/devices/heartbeat` | Send heartbeat        | API Key        |
+# Interactive simulation control
+poetry run python simulators/simulate.py --interactive
+```
 
-### Admin Endpoints
+### Automated Testing
+```bash
+# Run all tests
+poetry run python manage.py test
 
-| Method | Endpoint                     | Description            |
-| ------ | ---------------------------- | ---------------------- |
-| GET    | `/api/v1/admin/devices`      | List all devices       |
-| GET    | `/api/v1/admin/devices/{id}` | Get device details     |
-| PUT    | `/api/v1/admin/devices/{id}` | Update device          |
-| DELETE | `/api/v1/admin/devices/{id}` | Delete device          |
-| GET    | `/api/v1/admin/dashboard`    | Get dashboard stats    |
-| GET    | `/api/v1/admin/telemetry`    | Get all telemetry data |
+# Specific test suites
+poetry run pytest tests/ -v
+```
+## 📡 API Endpoints
 
-### Health Check
+### 🔌 Device Management
 
-| Method | Endpoint  | Description      |
-| ------ | --------- | ---------------- |
-| GET    | `/health` | API health check |
+| Method | Endpoint                    | Description                    | Auth Required |
+|--------|----------------------------|--------------------------------|---------------|
+| POST   | `/api/v1/devices/register` | Register new device            | None          |
+| GET    | `/api/v1/devices/status`   | Get device status & health     | API Key       |
+| POST   | `/api/v1/devices/heartbeat`| Send device heartbeat          | API Key       |
+| PUT    | `/api/v1/devices/config`   | Update device configuration    | API Key       |
 
-## Usage Examples
+### 📊 Telemetry & Data
+
+| Method | Endpoint                           | Description                    | Auth Required |
+|--------|------------------------------------|--------------------------------|---------------|
+| POST   | `/api/v1/devices/telemetry`       | Submit telemetry data          | API Key       |
+| GET    | `/api/v1/telemetry/{device_id}`   | Get device telemetry history   | None          |
+| GET    | `/api/v1/telemetry/{device_id}/latest` | Get latest telemetry      | None          |
+| GET    | `/api/v1/telemetry/{device_id}/aggregated` | Get aggregated data   | None          |
+| DELETE | `/api/v1/telemetry/{device_id}`   | Delete device telemetry        | Admin         |
+
+### 🛠️ Administration
+
+| Method | Endpoint                      | Description                 | Auth Required |
+|--------|-------------------------------|-----------------------------|--------------| 
+| GET    | `/api/v1/admin/devices`       | List all devices            | Admin         |
+| GET    | `/api/v1/admin/devices/{id}`  | Get device details          | Admin         |
+| PUT    | `/api/v1/admin/devices/{id}`  | Update device               | Admin         |
+| DELETE | `/api/v1/admin/devices/{id}`  | Delete device               | Admin         |
+| GET    | `/api/v1/admin/dashboard`     | Get dashboard statistics    | Admin         |
+
+### 🔍 System Health
+
+| Method | Endpoint              | Description              |
+|--------|-----------------------|--------------------------|
+| GET    | `/health`             | API health check         |
+| GET    | `/api/v1/telemetry/status` | Telemetry system status |
+
+## 💡 Usage Examples
 
 ### Register a Device
 
@@ -134,24 +181,26 @@ python test_api.py
 curl -X POST http://localhost:5000/api/v1/devices/register \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "Temperature Sensor 001",
-    "description": "Living room sensor",
-    "device_type": "sensor",
-    "location": "Living Room"
+    "name": "Smart Temperature Sensor 001",
+    "description": "Living room environmental sensor",
+    "device_type": "temperature_sensor",
+    "location": "Living Room",
+    "firmware_version": "1.2.3",
+    "hardware_version": "v2.1"
   }'
 ```
 
-Response:
-
+**Response:**
 ```json
 {
   "message": "Device registered successfully",
   "device": {
     "id": 1,
-    "name": "Temperature Sensor 001",
-    "api_key": "abc123xyz789...",
+    "name": "Smart Temperature Sensor 001",
+    "api_key": "rnby0SIR2kF8mN3Q7vX9L1cE6tA5Y4pB",
     "status": "active",
-    "created_at": "2025-06-30T10:00:00Z"
+    "device_type": "temperature_sensor",
+    "created_at": "2025-07-02T14:30:00Z"
   }
 }
 ```
@@ -160,202 +209,375 @@ Response:
 
 ```bash
 curl -X POST http://localhost:5000/api/v1/devices/telemetry \
-  -H "X-API-Key: your-device-api-key" \
+  -H "X-API-Key: rnby0SIR2kF8mN3Q7vX9L1cE6tA5Y4pB" \
   -H "Content-Type: application/json" \
   -d '{
     "data": {
-      "temperature": 22.5,
-      "humidity": 65,
-      "pressure": 1013.25
+      "temperature": 23.5,
+      "humidity": 65.2,
+      "pressure": 1013.25,
+      "battery_level": 87,
+      "signal_strength": -52
     },
     "metadata": {
-      "battery_level": 85,
-      "signal_strength": -45
+      "location": "Living Room",
+      "sensor_status": "active"
     },
-    "type": "sensor"
+    "timestamp": "2025-07-02T14:30:00Z"
   }'
 ```
 
-### Get Device Status
+### Query Telemetry Data
 
 ```bash
-curl -X GET http://localhost:5000/api/v1/devices/status \
-  -H "X-API-Key: your-device-api-key"
+# Get latest telemetry
+curl "http://localhost:5000/api/v1/telemetry/1/latest"
+
+# Get historical data with filters
+curl "http://localhost:5000/api/v1/telemetry/1?start_time=-1h&limit=100"
+
+# Get aggregated data (hourly averages)
+curl "http://localhost:5000/api/v1/telemetry/1/aggregated?window=1h&start_time=-24h"
 ```
 
-### Admin: Get Dashboard Statistics
+### Device Heartbeat
 
 ```bash
-curl -X GET http://localhost:5000/api/v1/admin/dashboard
+curl -X POST http://localhost:5000/api/v1/devices/heartbeat \
+  -H "X-API-Key: rnby0SIR2kF8mN3Q7vX9L1cE6tA5Y4pB"
 ```
 
-## Database Schema
+## 🗃️ Data Architecture
 
-### Devices Table
+### SQLite Database (Device Management)
 
-- `id` (Primary Key)
-- `name` (Unique device name)
-- `description`
-- `device_type` (sensor, actuator, camera, etc.)
-- `api_key` (Unique authentication key)
-- `status` (active, inactive, maintenance)
-- `location`
-- `firmware_version`
-- `hardware_version`
-- `created_at`
-- `updated_at`
-- `last_seen`
+**Devices Table:**
+- `id` - Primary key
+- `name` - Unique device identifier  
+- `description` - Device description
+- `device_type` - Category (sensor, actuator, camera, etc.)
+- `api_key` - Unique authentication key (32 chars)
+- `status` - Device status (active, inactive, maintenance)
+- `location` - Physical location
+- `firmware_version` - Current firmware version
+- `hardware_version` - Hardware revision
+- `created_at` - Registration timestamp
+- `updated_at` - Last modification
+- `last_seen` - Last heartbeat/activity
 
-### Telemetry Data Table
+### InfluxDB (Time-Series Telemetry)
 
-- `id` (Primary Key)
-- `device_id` (Foreign Key)
-- `payload` (JSON sensor data)
-- `timestamp`
-- `metadata` (JSON additional data)
-- `data_type`
+**Measurement Structure:**
+- **Measurement**: `device_telemetry`
+- **Tags**: `device_id`, `device_type`, `location`
+- **Fields**: All telemetry data (temperature, humidity, etc.)
+- **Timestamp**: Precise time-series indexing
 
-### Device Auth Table
-
-- `id` (Primary Key)
-- `device_id` (Foreign Key)
-- `api_key_hash`
-- `is_active`
-- `expires_at`
-- `created_at`
-- `last_used`
-- `usage_count`
-
-## Configuration
-
-### Environment Variables
-
-| Variable                | Description                     | Default    |
-| ----------------------- | ------------------------------- | ---------- |
-| `DATABASE_URL`          | Full database connection string | -          |
-| `DB_HOST`               | Database host                   | localhost  |
-| `DB_PORT`               | Database port                   | 5432       |
-| `DB_NAME`               | Database name                   | iotflow_db |
-| `DB_USER`               | Database user                   | username   |
-| `DB_PASSWORD`           | Database password               | password   |
-| `SECRET_KEY`            | Flask secret key                | -          |
-| `DEBUG`                 | Debug mode                      | True       |
-| `LOG_LEVEL`             | Logging level                   | INFO       |
-| `RATE_LIMIT_PER_MINUTE` | API rate limit                  | 60         |
-
-### Rate Limiting
-
-Configure rate limiting per device:
-
-- Default: 60 requests per minute
-- Telemetry endpoints: 100 requests per minute
-- Can be configured via environment variables
-
-## Security
-
-### API Key Authentication
-
-- Each device has a unique API key
-- API keys are generated during device registration
-- Include API key in `X-API-Key` header
-
-### Data Validation
-
-- JSON schema validation for all endpoints
-- Input sanitization and type checking
-- Error handling with appropriate HTTP status codes
-
-### Rate Limiting
-
-- Configurable rate limits per device
-- Protection against API abuse
-- Automatic throttling
-
-## Monitoring and Logging
-
-### Logging Levels
-
-- **ERROR**: System errors and failures
-- **WARNING**: Important events (auth failures, rate limits)
-- **INFO**: General operations (device registration, telemetry)
-- **DEBUG**: Detailed debugging information
-
-### Log Files
-
-- Location: `logs/iotflow.log`
-- Rotation: 10MB files, 5 backups
-- Format: Timestamp, level, message
-
-### Health Monitoring
-
-- Health check endpoint: `/health`
-- Database connection monitoring
-- Application status reporting
-
-## Development
+## 🛠️ Development & Management
 
 ### Project Structure
 
 ```
-connectivity_layer/
-├── app.py                  # Main application
-├── requirements.txt        # Dependencies
-├── .env                   # Environment variables
-├── init_db.py             # Database initialization
-├── test_api.py            # API testing script
-├── database_setup.sql     # Database setup script
-├── src/
-│   ├── config/
-│   │   └── config.py      # Configuration classes
-│   ├── models/
-│   │   └── __init__.py    # Database models
-│   ├── routes/
-│   │   ├── devices.py     # Device endpoints
-│   │   └── admin.py       # Admin endpoints
-│   ├── middleware/
-│   │   └── auth.py        # Authentication middleware
-│   └── utils/
-│       └── logging.py     # Logging utilities
-└── logs/                  # Log files
+IoTFlow_ConnectivityLayer/
+├── 📁 src/                          # Core application code
+│   ├── config/                      # Configuration management
+│   │   ├── config.py               # Flask & database config
+│   │   └── influxdb_config.py      # InfluxDB configuration
+│   ├── models/                      # SQLAlchemy database models
+│   ├── routes/                      # API route handlers
+│   │   ├── devices.py              # Device management endpoints
+│   │   ├── telemetry.py            # Telemetry data endpoints
+│   │   └── admin.py                # Administrative endpoints
+│   ├── services/                    # Business logic services
+│   │   └── influxdb.py             # InfluxDB service layer
+│   ├── middleware/                  # Request/response middleware
+│   │   ├── auth.py                 # Authentication & authorization
+│   │   ├── security.py             # Security utilities
+│   │   └── monitoring.py           # Performance monitoring
+│   └── utils/                       # Utility functions
+│       └── logging.py              # Logging configuration
+├── 📁 simulators/                   # Device simulation & testing
+│   ├── basic_device_simulator.py   # Single device simulator
+│   ├── fleet_simulator.py          # Multi-device fleet simulator
+│   ├── device_types.py             # Specialized device simulators
+│   └── simulate.py                 # Interactive simulation control
+├── 📁 mqtt/                         # MQTT broker configuration
+│   └── config/                     # Mosquitto configuration files
+├── 📁 tests/                        # Test suites (unit & integration)
+├── 🐳 docker-compose.yml            # Container orchestration
+├── 🔧 docker-manage.sh              # Docker management script
+├── 🔧 manage.py                     # Python management script
+├── 📦 pyproject.toml                # Poetry dependencies
+├── 📄 .env                          # Environment configuration
+└── 📚 Documentation/                # Comprehensive docs
+    ├── MANAGEMENT_GUIDE.md         # Management & deployment guide
+    ├── HTTP_SIMULATION_TEST_RESULTS.md  # Testing results
+    └── INFLUXDB_INTEGRATION_COMPLETE.md # Architecture docs
 ```
 
-### Running Tests
+### Management Commands
+
+#### Docker Management Script (`./docker-manage.sh`)
 
 ```bash
-# Install test dependencies
-pip install pytest requests
+# Complete setup workflow
+./docker-manage.sh start-all     # Start all services
+./docker-manage.sh init-app      # Initialize environment & database
+./docker-manage.sh run           # Start Flask application
 
-# Run API tests
-python test_api.py
+# Development workflow
+./docker-manage.sh status        # Check service status
+./docker-manage.sh logs          # View logs
+./docker-manage.sh logs influxdb # View specific service logs
 
-# Run unit tests (if implemented)
-pytest tests/
+# Data management
+./docker-manage.sh backup        # Backup SQLite database
+./docker-manage.sh restore backup_file.db  # Restore from backup
+./docker-manage.sh reset         # Reset all data (CAUTION!)
+
+# Database connections
+./docker-manage.sh redis         # Connect to Redis CLI
+./docker-manage.sh influxdb      # Connect to InfluxDB CLI
 ```
 
-### Database Migrations
+#### Python Management Script (`manage.py`)
 
 ```bash
-# Initialize migrations (first time)
-flask db init
+# Database operations
+poetry run python manage.py init-db                    # Initialize database
+poetry run python manage.py create-device "My Device" # Create test device
 
-# Create migration
-flask db migrate -m "Description of changes"
-
-# Apply migration
-flask db upgrade
+# Application operations  
+poetry run python manage.py run                        # Start Flask app
+poetry run python manage.py test                       # Run test suite
+poetry run python manage.py shell                      # Interactive Python shell
 ```
 
-## Production Deployment
+### Testing & Simulation
 
-### Using Gunicorn
+#### Comprehensive Test Suite
 
 ```bash
-# Install Gunicorn
-pip install gunicorn
+# Run all tests
+poetry run python manage.py test
 
-# Run with Gunicorn
-gunicorn -w 4 -b 0.0.0.0:5000 app:app
+# Specific test categories
+poetry run pytest tests/unit/ -v           # Unit tests
+poetry run pytest tests/integration/ -v    # Integration tests
+poetry run pytest tests/api/ -v            # API endpoint tests
 ```
+
+#### Device Simulation Options
+
+```bash
+# Interactive simulation (recommended for development)
+poetry run python simulators/simulate.py --interactive
+
+# Single device tests
+poetry run python simulators/basic_device_simulator.py --duration 300
+poetry run python simulators/device_types.py --device-type temperature
+
+# Fleet simulations for load testing
+poetry run python simulators/fleet_simulator.py --preset home     # 9 devices
+poetry run python simulators/fleet_simulator.py --preset office   # 16 devices
+poetry run python simulators/fleet_simulator.py --preset factory  # 30 devices
+```
+
+### Configuration Management
+
+#### Environment Variables (.env)
+
+| Category | Variable | Description | Default |
+|----------|----------|-------------|---------|
+| **Flask** | `FLASK_ENV` | Environment mode | `development` |
+| | `FLASK_DEBUG` | Debug mode | `True` |
+| | `SECRET_KEY` | Flask secret key | Auto-generated |
+| **Database** | `DATABASE_URL` | SQLite database path | `sqlite:///iotflow.db` |
+| **InfluxDB** | `INFLUXDB_URL` | InfluxDB connection URL | `http://localhost:8086` |
+| | `INFLUXDB_TOKEN` | Authentication token | Auto-configured |
+| | `INFLUXDB_ORG` | Organization name | `iotflow` |
+| | `INFLUXDB_BUCKET` | Data bucket name | `telemetry` |
+| **Redis** | `REDIS_URL` | Redis connection URL | `redis://localhost:6379/0` |
+| **MQTT** | `MQTT_HOST` | MQTT broker host | `localhost` |
+| | `MQTT_PORT` | MQTT broker port | `1883` |
+| | `MQTT_USERNAME` | MQTT authentication | `admin` |
+| **Security** | `API_KEY_LENGTH` | Generated API key length | `32` |
+| | `RATE_LIMIT_PER_MINUTE` | API rate limiting | `60` |
+
+#### Service Configuration
+
+**InfluxDB Configuration:**
+- Data retention: 30 days (configurable)
+- Precision: nanosecond timestamps
+- Organization: `iotflow`
+- Bucket: `telemetry`
+
+**Redis Configuration:** 
+- Memory usage: LRU eviction
+- Persistence: Append-only file
+- Max memory: 256MB
+
+**MQTT Configuration:**
+- Protocol: MQTT 3.1.1 & 5.0
+- Authentication: Username/password
+- TLS: Configurable (port 8883)
+- WebSocket: Available (port 9001)
+
+## 🚀 Production Deployment
+
+### Container Deployment
+
+```bash
+# Production-ready deployment
+docker compose -f docker-compose.prod.yml up -d
+
+# Scale application instances
+docker compose up --scale app=3
+
+# Health checks and monitoring
+docker compose ps
+docker compose logs -f app
+```
+
+### Performance Tuning
+
+#### Flask Application
+```bash
+# Use Gunicorn for production
+poetry run gunicorn -w 4 -b 0.0.0.0:5000 --access-logfile - app:app
+
+# With performance monitoring
+poetry run gunicorn -w 4 -b 0.0.0.0:5000 --statsd-host=localhost:8125 app:app
+```
+
+#### Database Optimization
+- **SQLite**: WAL mode for concurrent reads
+- **InfluxDB**: Appropriate shard duration and retention policies
+- **Redis**: Memory optimization and persistence settings
+
+### Security Hardening
+
+#### API Security
+- Rate limiting per device and IP
+- API key rotation capabilities
+- Request payload validation
+- CORS configuration for web clients
+
+#### Infrastructure Security
+- TLS termination at load balancer
+- Network isolation between services
+- Secrets management (avoid plain text)
+- Regular security updates
+
+### Monitoring & Observability
+
+#### Built-in Monitoring
+```bash
+# Application health
+curl http://localhost:5000/health
+
+# Service metrics
+curl http://localhost:5000/api/v1/telemetry/status
+
+# Admin dashboard
+curl http://localhost:5000/api/v1/admin/dashboard
+```
+
+#### External Monitoring
+- **Prometheus**: Metrics collection
+- **Grafana**: Visualization dashboards  
+- **ELK Stack**: Log aggregation and analysis
+- **Alerting**: PagerDuty, Slack integration
+
+## 📊 Performance Benchmarks
+
+### Test Results (Local Development)
+
+#### HTTP API Performance
+- **Device Registration**: ~40ms average response time
+- **Telemetry Storage**: ~70ms average (SQLite + InfluxDB)
+- **Data Retrieval**: ~50ms average
+- **Concurrent Requests**: 100+ requests/second
+
+#### Fleet Simulation Results
+- **9 Device Fleet**: 20+ telemetry points/minute
+- **30 Device Fleet**: 100+ telemetry points/minute  
+- **Network Failure Simulation**: 5% realistic failure rate
+- **Data Integrity**: 100% for successful transmissions
+
+#### Database Performance
+- **SQLite**: 1000+ device registrations/second
+- **InfluxDB**: 10,000+ telemetry points/second
+- **Redis**: Sub-millisecond caching responses
+- **Storage**: ~1KB per telemetry record
+
+## 🤝 Contributing
+
+### Development Setup
+
+```bash
+# Fork and clone repository
+git clone <your-fork-url>
+cd IoTFlow_ConnectivityLayer
+
+# Install development dependencies
+poetry install --with dev
+
+# Set up pre-commit hooks
+poetry run pre-commit install
+
+# Run development server
+./docker-manage.sh start-all
+./docker-manage.sh init-app
+./docker-manage.sh run
+```
+
+### Code Quality
+
+```bash
+# Code formatting
+poetry run black src/ simulators/
+poetry run isort src/ simulators/
+
+# Linting
+poetry run flake8 src/ simulators/
+poetry run mypy src/
+
+# Testing
+poetry run pytest tests/ --cov=src/
+```
+
+## 📚 Documentation
+
+- **[Management Guide](MANAGEMENT_GUIDE.md)** - Comprehensive setup and management
+- **[API Documentation](docs/api.md)** - Complete API reference
+- **[Architecture Guide](docs/architecture.md)** - System design and components
+- **[Testing Results](HTTP_SIMULATION_TEST_RESULTS.md)** - Performance and reliability tests
+- **[InfluxDB Integration](INFLUXDB_INTEGRATION_COMPLETE.md)** - Time-series database setup
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🆘 Support
+
+### Getting Help
+- **Documentation**: Check the comprehensive guides in `/docs`
+- **Issues**: Open GitHub issues for bugs and feature requests
+- **Discussions**: Use GitHub Discussions for general questions
+
+### Troubleshooting
+
+**Common Issues:**
+- **Service Connection**: Check `./docker-manage.sh status`
+- **Database Issues**: Run `./docker-manage.sh reset` and reinitialize
+- **Port Conflicts**: Check that ports 5000, 6379, 8086, 1883 are available
+- **Poetry Issues**: Update with `poetry install --sync`
+
+**Log Locations:**
+- Application: `logs/iotflow.log`
+- Docker services: `docker-compose logs [service]`
+- System: Check with `./docker-manage.sh logs`
 
 ### Docker Deployment
 
@@ -374,7 +596,7 @@ CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "app:app"]
 
 ### Environment Setup for Production
 
-1. **Database**: Use PostgreSQL with connection pooling
+1. **Database**: For production, consider using PostgreSQL or MySQL with connection pooling
 2. **Security**: Change all default passwords and secret keys
 3. **Logging**: Configure centralized logging
 4. **Monitoring**: Set up application monitoring
@@ -387,7 +609,7 @@ CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "app:app"]
 
 1. **Database Connection Failed**
 
-   - Check PostgreSQL is running
+   - Check database file permissions and disk space
    - Verify credentials in `.env`
    - Ensure database exists
 

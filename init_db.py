@@ -110,9 +110,9 @@ def check_database_connection():
         except Exception as e:
             print(f"✗ Database connection failed: {str(e)}")
             print("\nPlease check:")
-            print("1. PostgreSQL is running")
-            print("2. Database credentials in .env file are correct")
-            print("3. Database exists and is accessible")
+            print("1. Database file permissions")
+            print("2. Disk space available")
+            print("3. SQLite installation")
             return False
 
 if __name__ == '__main__':
