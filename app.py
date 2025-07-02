@@ -74,18 +74,102 @@ def create_app(config_name=None):
             def handle_telemetry_data(telemetry_data):
                 """Handle incoming telemetry data"""
                 try:
-                    # TODO: Store telemetry data in database
-                    # This would integrate with your existing device models
-                    app.logger.debug(f"Received telemetry: {telemetry_data}")
+                    app.logger.info(f"Received MQTT telemetry: {telemetry_data}")
+                    
+                    # Check if data is in nested format (from MQTT client handler)
+                    if 'data' in telemetry_data and isinstance(telemetry_data['data'], dict):
+                        # Extract from nested structure
+                        payload = telemetry_data['data']
+                        device_id = payload.get('device_id') or telemetry_data.get('device_id')
+                        device_type = payload.get('device_type', 'unknown')
+                        measurements = payload.get('measurements', {})
+                        status = payload.get('status', {})
+                        metadata = payload.get('metadata', {})
+                        timestamp = payload.get('timestamp') or telemetry_data.get('timestamp')
+                        
+                        app.logger.info(f"Processing nested MQTT payload: {payload}")
+                    else:
+                        # Extract data directly from telemetry payload
+                        device_id = telemetry_data.get('device_id')
+                        device_type = telemetry_data.get('device_type', 'unknown')
+                        measurements = telemetry_data.get('measurements', {})
+                        status = telemetry_data.get('status', {})
+                        metadata = telemetry_data.get('metadata', {})
+                        timestamp = telemetry_data.get('timestamp')
+                    
+                    # Validate required fields
+                    if not device_id or not measurements:
+                        app.logger.warning("Invalid MQTT telemetry data: missing device_id or measurements")
+                        return
+                    
+                    # Store in InfluxDB
+                    from src.services.influxdb import InfluxDBService
+                    influx_service = InfluxDBService()
+                    
+                    # Store measurements
+                    influx_success = influx_service.write_telemetry_data(
+                        device_id=device_id,
+                        data=measurements,
+                        device_type=device_type,
+                        metadata=metadata,
+                        timestamp=timestamp
+                    )
+                    
+                    # Store status data if present
+                    if status and isinstance(status, dict):
+                        influx_service.write_telemetry_data(
+                            device_id=device_id,
+                            data=status,
+                            device_type=device_type,
+                            metadata={"data_type": "status", **metadata} if metadata else {"data_type": "status"},
+                            timestamp=timestamp
+                        )
+                    
+                    if influx_success:
+                        app.logger.info(f"MQTT telemetry data for {device_id} stored in InfluxDB")
+                    else:
+                        app.logger.warning(f"Failed to store MQTT telemetry for {device_id} in InfluxDB")
+                        
                 except Exception as e:
-                    app.logger.error(f"Error processing telemetry: {e}")
+                    app.logger.error(f"Error processing MQTT telemetry: {e}")
             
             # Add status callback to update device status
             def handle_device_status(status_data):
                 """Handle device status updates"""
                 try:
-                    # TODO: Update device status in database
-                    app.logger.debug(f"Device status update: {status_data}")
+                    app.logger.info(f"Received device status update: {status_data}")
+                    
+                    # Extract data
+                    device_id = status_data.get('device_id')
+                    status = status_data.get('status')
+                    
+                    if not device_id or not status:
+                        app.logger.warning("Invalid status update: missing device_id or status")
+                        return
+                    
+                    # Store status in InfluxDB
+                    from src.services.influxdb import InfluxDBService
+                    influx_service = InfluxDBService()
+                    
+                    # Create a data point for the status
+                    from datetime import datetime
+                    status_data = {
+                        "status": status,
+                        "updated_at": datetime.now().isoformat()
+                    }
+                    
+                    influx_success = influx_service.write_telemetry_data(
+                        device_id=device_id,
+                        data=status_data,
+                        device_type="device_status",
+                        metadata={"data_type": "device_status"},
+                    )
+                    
+                    if influx_success:
+                        app.logger.info(f"Device status for {device_id} updated to {status}")
+                    else:
+                        app.logger.warning(f"Failed to update status for device {device_id}")
+                        
                 except Exception as e:
                     app.logger.error(f"Error processing device status: {e}")
             
