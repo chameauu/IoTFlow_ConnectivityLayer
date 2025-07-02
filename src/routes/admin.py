@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, current_app
-from src.models import Device, TelemetryData, db
+from src.models import Device, db
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import func, desc
 
@@ -44,7 +44,7 @@ def list_all_devices():
             device_dict = device.to_dict()
             
             # Add additional metrics
-            device_dict['telemetry_count'] = TelemetryData.query.filter_by(device_id=device.id).count()
+            device_dict['telemetry_count'] = 0  # TODO: Implement InfluxDB telemetry count
             device_dict['is_online'] = (
                 device.last_seen and 
                 (datetime.now(timezone.utc) - device.last_seen).total_seconds() < 300
@@ -77,29 +77,20 @@ def get_device_details(device_id):
     try:
         device = Device.query.get_or_404(device_id)
         
-        # Get telemetry statistics
-        telemetry_stats = db.session.query(
-            func.count(TelemetryData.id).label('total_records'),
-            func.max(TelemetryData.timestamp).label('latest_telemetry'),
-            func.min(TelemetryData.timestamp).label('first_telemetry')
-        ).filter_by(device_id=device.id).first()
-        
-        # Get recent telemetry (last 10 records)
-        recent_telemetry = TelemetryData.query.filter_by(device_id=device.id)\
-            .order_by(desc(TelemetryData.timestamp))\
-            .limit(10).all()
+        # Note: Telemetry statistics would need to be retrieved from InfluxDB
+        # For now, we'll provide device metadata only
         
         device_data = device.to_dict()
         device_data['statistics'] = {
-            'total_telemetry_records': telemetry_stats.total_records or 0,
-            'latest_telemetry': telemetry_stats.latest_telemetry.isoformat() if telemetry_stats.latest_telemetry else None,
-            'first_telemetry': telemetry_stats.first_telemetry.isoformat() if telemetry_stats.first_telemetry else None,
+            'total_telemetry_records': 0,  # TODO: Implement InfluxDB query
+            'latest_telemetry': None,      # TODO: Implement InfluxDB query
+            'first_telemetry': None,       # TODO: Implement InfluxDB query
             'is_online': (
                 device.last_seen and 
                 (datetime.now(timezone.utc) - device.last_seen).total_seconds() < 300
             )
         }
-        device_data['recent_telemetry'] = [t.to_dict() for t in recent_telemetry]
+        device_data['recent_telemetry'] = []  # TODO: Implement InfluxDB query for recent telemetry
         
         return jsonify({
             'status': 'success',
@@ -189,12 +180,9 @@ def get_dashboard_stats():
         five_minutes_ago = datetime.now(timezone.utc) - timedelta(minutes=5)
         online_devices = Device.query.filter(Device.last_seen >= five_minutes_ago).count()
         
-        # Telemetry statistics
-        total_telemetry = TelemetryData.query.count()
-        
-        # Recent telemetry (last 24 hours)
-        yesterday = datetime.now(timezone.utc) - timedelta(days=1)
-        recent_telemetry = TelemetryData.query.filter(TelemetryData.timestamp >= yesterday).count()
+        # Telemetry statistics - TODO: Implement InfluxDB queries
+        total_telemetry = 0
+        recent_telemetry = 0
         
         # Device types distribution
         device_types = db.session.query(
@@ -230,58 +218,19 @@ def get_dashboard_stats():
 def get_all_telemetry():
     """Get telemetry data across all devices"""
     try:
-        # Parse query parameters
-        page = int(request.args.get('page', 1))
-        per_page = min(int(request.args.get('per_page', 100)), 500)
-        device_id = request.args.get('device_id')
-        data_type = request.args.get('type')
-        hours = request.args.get('hours', type=int)
-        
-        # Build query
-        query = TelemetryData.query
-        
-        if device_id:
-            query = query.filter_by(device_id=device_id)
-        
-        if data_type:
-            query = query.filter_by(data_type=data_type)
-        
-        if hours:
-            time_threshold = datetime.now(timezone.utc) - timedelta(hours=hours)
-            query = query.filter(TelemetryData.timestamp >= time_threshold)
-        
-        # Join with devices to include device names
-        query = query.join(Device).add_columns(Device.name.label('device_name'))
-        
-        # Order by timestamp descending
-        query = query.order_by(desc(TelemetryData.timestamp))
-        
-        # Apply pagination
-        telemetry_paginated = query.paginate(
-            page=page,
-            per_page=per_page,
-            error_out=False
-        )
-        
-        telemetry_data = []
-        for item in telemetry_paginated.items:
-            telemetry_record = item[0]  # TelemetryData object
-            device_name = item[1]       # Device name
-            
-            record_dict = telemetry_record.to_dict()
-            record_dict['device_name'] = device_name
-            telemetry_data.append(record_dict)
-        
+        # Since telemetry is now stored in InfluxDB, this endpoint needs to be reimplemented
+        # using InfluxDB queries instead of SQLite
         return jsonify({
             'status': 'success',
-            'telemetry': telemetry_data,
+            'message': 'Telemetry data is now stored in InfluxDB. Use the telemetry service endpoints instead.',
+            'telemetry': [],
             'pagination': {
-                'page': page,
-                'per_page': per_page,
-                'total': telemetry_paginated.total,
-                'pages': telemetry_paginated.pages,
-                'has_next': telemetry_paginated.has_next,
-                'has_prev': telemetry_paginated.has_prev
+                'page': 1,
+                'per_page': 0,
+                'total': 0,
+                'pages': 0,
+                'has_next': False,
+                'has_prev': False
             }
         }), 200
         

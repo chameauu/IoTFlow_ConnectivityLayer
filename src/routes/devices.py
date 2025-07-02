@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, current_app
-from src.models import Device, TelemetryData, db
+from src.models import Device, db
 from src.middleware.auth import authenticate_device, validate_json_payload, rate_limit_device
 from src.middleware.monitoring import device_heartbeat_monitor, request_metrics_middleware
 from src.middleware.security import security_headers_middleware, input_sanitization_middleware
@@ -70,8 +70,8 @@ def get_device_status():
     try:
         device = request.device
         
-        # Get latest telemetry count
-        telemetry_count = TelemetryData.query.filter_by(device_id=device.id).count()
+        # Get latest telemetry count from InfluxDB
+        telemetry_count = influx_service.get_device_telemetry_count(str(device.id))
         
         response = device.to_dict()
         response['telemetry_count'] = telemetry_count
@@ -114,24 +114,10 @@ def submit_telemetry():
                 'message': 'Telemetry data must be a JSON object'
             }), 400
         
-        # Store in both SQLite (for compatibility) and InfluxDB (for time-series)
+        # Store only in InfluxDB for time-series analysis
         timestamp = datetime.now(timezone.utc)
         
-        # Store in SQLite (existing functionality)
-        telemetry = TelemetryData(
-            device_id=device.id,
-            data_type=data.get('type', 'sensor'),
-            timestamp=timestamp
-        )
-        
-        # Set JSON data using helper methods
-        telemetry.set_payload(telemetry_payload)
-        telemetry.set_metadata(data.get('metadata', {}))
-        
-        db.session.add(telemetry)
-        db.session.commit()
-        
-        # Store in InfluxDB for time-series analysis
+        # Store in InfluxDB
         influx_success = influx_service.write_telemetry_data(
             device_id=str(device.id),
             data=telemetry_payload,
@@ -140,21 +126,26 @@ def submit_telemetry():
             timestamp=timestamp
         )
         
-        # Update device last_seen
+        if not influx_success:
+            return jsonify({
+                'error': 'Failed to store telemetry data',
+                'message': 'InfluxDB storage failed. Check server logs.'
+            }), 500
+        
+        # Update device last_seen in SQLite
         device.update_last_seen()
         
         current_app.logger.info(
             f"Telemetry received from device {device.name} (ID: {device.id}) - "
-            f"SQLite: ✓, InfluxDB: {'✓' if influx_success else '✗'}"
+            f"InfluxDB: ✓"
         )
         
         return jsonify({
             'message': 'Telemetry data received successfully',
-            'telemetry_id': telemetry.id,
             'device_id': device.id,
             'device_name': device.name,
             'timestamp': timestamp.isoformat(),
-            'stored_in_sqlite': True,
+            'data_points': len(telemetry_payload),
             'stored_in_influxdb': influx_success
         }), 201
         
@@ -169,36 +160,29 @@ def submit_telemetry():
 @device_bp.route('/telemetry', methods=['GET'])
 @authenticate_device
 def get_telemetry():
-    """Get telemetry data for device"""
+    """Get telemetry data for device from InfluxDB"""
     try:
         device = request.device
         
         # Parse query parameters
         limit = min(int(request.args.get('limit', 100)), 1000)  # Max 1000 records
-        offset = int(request.args.get('offset', 0))
-        data_type = request.args.get('type')
+        start_time = request.args.get('start_time', '-1h')  # Default to last hour
         
-        # Build query
-        query = TelemetryData.query.filter_by(device_id=device.id)
-        
-        if data_type:
-            query = query.filter_by(data_type=data_type)
-        
-        # Order by timestamp descending (newest first)
-        query = query.order_by(TelemetryData.timestamp.desc())
-        
-        # Apply pagination
-        telemetry_records = query.offset(offset).limit(limit).all()
-        
-        # Convert to dict
-        telemetry_data = [record.to_dict() for record in telemetry_records]
+        # Get telemetry data from InfluxDB
+        telemetry_data = influx_service.get_device_telemetry(
+            device_id=str(device.id),
+            start_time=start_time,
+            limit=limit
+        )
         
         return jsonify({
             'status': 'success',
+            'device_id': device.id,
+            'device_name': device.name,
             'telemetry': telemetry_data,
             'count': len(telemetry_data),
-            'limit': limit,
-            'offset': offset
+            'start_time': start_time,
+            'limit': limit
         }), 200
         
     except Exception as e:

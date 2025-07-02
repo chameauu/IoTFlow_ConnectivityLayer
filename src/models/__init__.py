@@ -29,8 +29,8 @@ class Device(db.Model):
     last_seen = db.Column(db.DateTime(timezone=True))
     
     # Relationships
-    telemetry_data = db.relationship('TelemetryData', backref='device', lazy='dynamic', cascade='all, delete-orphan')
     auth_records = db.relationship('DeviceAuth', backref='device', lazy='dynamic', cascade='all, delete-orphan')
+    configurations = db.relationship('DeviceConfiguration', backref='device', lazy='dynamic', cascade='all, delete-orphan')
     
     def __repr__(self):
         return f'<Device {self.name}>'
@@ -55,54 +55,6 @@ class Device(db.Model):
         """Update the last seen timestamp"""
         self.last_seen = datetime.now(timezone.utc)
         db.session.commit()
-
-class TelemetryData(db.Model):
-    """Telemetry data model for storing device sensor data"""
-    __tablename__ = 'telemetry_data'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    device_id = db.Column(db.Integer, db.ForeignKey('devices.id'), nullable=False)
-    payload = db.Column(db.Text, nullable=False)  # Store sensor data as JSON text
-    timestamp = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    device_metadata = db.Column(db.Text)  # Additional metadata like signal strength, battery level
-    data_type = db.Column(db.String(50), default='sensor')  # sensor, status, config, etc.
-    
-    # Indexes for better query performance
-    __table_args__ = (
-        db.Index('idx_device_timestamp', 'device_id', 'timestamp'),
-        db.Index('idx_timestamp', 'timestamp'),
-        db.Index('idx_data_type', 'data_type'),
-    )
-    
-    def __repr__(self):
-        return f'<TelemetryData device_id={self.device_id} timestamp={self.timestamp}>'
-    
-    def set_payload(self, data):
-        """Set payload data as JSON string"""
-        self.payload = json.dumps(data) if data else None
-    
-    def get_payload(self):
-        """Get payload data as Python object"""
-        return json.loads(self.payload) if self.payload else None
-    
-    def set_metadata(self, data):
-        """Set metadata as JSON string"""
-        self.device_metadata = json.dumps(data) if data else None
-    
-    def get_metadata(self):
-        """Get metadata as Python object"""
-        return json.loads(self.device_metadata) if self.device_metadata else None
-    
-    def to_dict(self):
-        """Convert telemetry data to dictionary"""
-        return {
-            'id': self.id,
-            'device_id': self.device_id,
-            'payload': self.get_payload(),
-            'timestamp': self.timestamp.isoformat() if self.timestamp else None,
-            'metadata': self.get_metadata(),
-            'data_type': self.data_type
-        }
 
 class DeviceAuth(db.Model):
     """Device authentication model for API key management"""

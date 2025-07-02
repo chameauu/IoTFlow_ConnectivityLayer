@@ -304,5 +304,36 @@ class InfluxDBService:
             print(f"Error getting device count: {e}")
             return 0
 
+    def get_device_telemetry_count(self, device_id: str, start_time: str = "-30d") -> int:
+        """
+        Get count of telemetry records for a specific device
+        """
+        if not self.is_available():
+            return 0
+            
+        try:
+            query = f'''
+            from(bucket: "{self.bucket}")
+                |> range(start: {start_time})
+                |> filter(fn: (r) => r["_measurement"] == "telemetry")
+                |> filter(fn: (r) => r["device_id"] == "{device_id}")
+                |> count()
+            '''
+            
+            result = self.query_api.query(org=self.org, query=query)
+            
+            total_count = 0
+            for table in result:
+                for record in table.records:
+                    count_value = record.get_value()
+                    if count_value:
+                        total_count += count_value
+            
+            return total_count
+            
+        except Exception as e:
+            print(f"Error getting device telemetry count: {e}")
+            return 0
+
 # Global service instance
 influx_service = InfluxDBService()
