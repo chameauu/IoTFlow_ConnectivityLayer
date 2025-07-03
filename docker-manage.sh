@@ -56,24 +56,24 @@ check_poetry() {
 
 # Start services
 start_services() {
-    log_step "Starting Redis, InfluxDB, and MQTT services..."
-    docker compose up -d redis influxdb mosquitto
+    log_step "Starting Redis, IoTDB, and MQTT services..."
+    docker compose up -d redis iotdb mosquitto
     
     log_step "Waiting for services to be ready..."
     
-    # Wait for InfluxDB
-    log_info "Waiting for InfluxDB to be ready..."
+    # Wait for IoTDB
+    log_info "Waiting for IoTDB to be ready..."
     timeout=60
     counter=0
-    while ! curl -s http://localhost:8086/health > /dev/null 2>&1; do
+    while ! nc -z localhost 6667 > /dev/null 2>&1; do
         if [ $counter -eq $timeout ]; then
-            log_error "InfluxDB failed to start within $timeout seconds"
+            log_error "IoTDB failed to start within $timeout seconds"
             exit 1
         fi
         sleep 1
         counter=$((counter + 1))
     done
-    log_info "InfluxDB is ready"
+    log_info "IoTDB is ready"
     
     # Wait for Redis
     log_info "Waiting for Redis to be ready..."
@@ -101,13 +101,13 @@ start_services() {
 
 # Start all services
 start_all() {
-    log_step "Starting all services (Redis, InfluxDB, MQTT)..."
+    log_step "Starting all services (Redis, IoTDB, MQTT)..."
     docker compose up -d
     
     log_step "Waiting for services to be ready..."
     start_services
     
-    log_info "InfluxDB UI is available at: http://localhost:8086"
+    log_info "IoTDB UI is available at: http://localhost:8181"
     log_info "MQTT broker is running on port 1883 (TLS: 8883, WebSocket: 9001)"
 }
 
@@ -193,10 +193,10 @@ redis_cli() {
     docker compose exec redis redis-cli
 }
 
-# Connect to InfluxDB CLI
-influxdb_cli() {
-    log_step "Connecting to InfluxDB CLI..."
-    docker compose exec influxdb influx
+# Connect to IoTDB CLI
+iotdb_cli() {
+    log_step "Connecting to IoTDB CLI..."
+    docker compose exec iotdb /iotdb/sbin/start-cli.sh -h localhost -p 6667 -u root -pw root
 }
 
 # Backup SQLite database
@@ -336,8 +336,8 @@ case "$1" in
     "redis")
         redis_cli
         ;;
-    "influxdb")
-        influxdb_cli
+    "iotdb")
+        iotdb_cli
         ;;
     "backup")
         backup
@@ -347,10 +347,10 @@ case "$1" in
         ;;
     *)
         echo "IoT Connectivity Layer - Docker Management"
-        echo "Usage: $0 {start|start-all|init-app|init-app-auth|update-mqtt-auth|run|test|stop|restart|status|logs|reset|redis|influxdb|backup|restore}"
+        echo "Usage: $0 {start|start-all|init-app|init-app-auth|update-mqtt-auth|run|test|stop|restart|status|logs|reset|redis|iotdb|backup|restore}"
         echo ""
         echo "Commands:"
-        echo "  start           - Start Redis, InfluxDB, and MQTT services"
+        echo "  start           - Start Redis, IoTDB, and MQTT services"
         echo "  start-all       - Start all services"
         echo "  init-app        - Initialize Python environment and SQLite database"
         echo "  init-app-auth   - Initialize app and setup MQTT authentication"
@@ -363,7 +363,7 @@ case "$1" in
         echo "  logs            - Show logs (optionally for specific service)"
         echo "  reset           - Reset all data (DANGEROUS!)"
         echo "  redis           - Connect to Redis CLI"
-        echo "  influxdb        - Connect to InfluxDB CLI"
+        echo "  iotdb           - Connect to IoTDB CLI"
         echo "  backup          - Create SQLite database backup"
         echo "  restore         - Restore SQLite database from backup"
         echo ""

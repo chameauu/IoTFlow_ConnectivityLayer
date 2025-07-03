@@ -13,11 +13,11 @@ class Config:
     # Redis Configuration
     REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
     
-    # InfluxDB Configuration
-    INFLUXDB_URL = os.environ.get('INFLUXDB_URL', 'http://localhost:8086')
-    INFLUXDB_TOKEN = os.environ.get('INFLUXDB_TOKEN', 'your-super-secret-token')
-    INFLUXDB_ORG = os.environ.get('INFLUXDB_ORG', 'iotflow')
-    INFLUXDB_BUCKET = os.environ.get('INFLUXDB_BUCKET', 'telemetry')
+    # IoTDB Configuration
+    IOTDB_HOST = os.environ.get('IOTDB_HOST', 'localhost')
+    IOTDB_PORT = int(os.environ.get('IOTDB_PORT', 6667))
+    IOTDB_USER = os.environ.get('IOTDB_USER', 'root')
+    IOTDB_PASSWORD = os.environ.get('IOTDB_PASSWORD', 'root')
     
     # API Configuration
     API_VERSION = os.environ.get('API_VERSION', 'v1')

@@ -26,6 +26,7 @@ wheels/
 MANIFEST
 
 test/
+backup_influxdb
 
 # Poetry
 poetry.lock

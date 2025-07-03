@@ -3,15 +3,15 @@ from src.models import Device, DeviceAuth, DeviceConfiguration, db
 from src.middleware.auth import authenticate_device, validate_json_payload, rate_limit_device
 from src.middleware.monitoring import device_heartbeat_monitor, request_metrics_middleware
 from src.middleware.security import security_headers_middleware, input_sanitization_middleware
-from src.services.influxdb import InfluxDBService
+from src.services.iotdb import IoTDBService
 from datetime import datetime, timezone
 import json
 
 # Create blueprint for device routes
 device_bp = Blueprint('devices', __name__, url_prefix='/api/v1/devices')
 
-# Initialize InfluxDB service for telemetry queries
-influx_service = InfluxDBService()
+# Initialize IoTDB service for telemetry queries
+iotdb_service = IoTDBService()
 
 @device_bp.route('/register', methods=['POST'])
 @security_headers_middleware()
@@ -73,11 +73,11 @@ def get_device_status():
     try:
         device = request.device
         
-        # Get telemetry count from InfluxDB instead of SQLite
+        # Get telemetry count from IoTDB instead of SQLite
         telemetry_count = 0
         try:
-            # Query InfluxDB for telemetry count (simplified)
-            telemetry_data = influx_service.get_device_telemetry(
+            # Query IoTDB for telemetry count (simplified)
+            telemetry_data = iotdb_service.get_device_telemetry(
                 device_id=str(device.id),
                 start_time='-30d',  # Last 30 days
                 limit=1
@@ -85,7 +85,7 @@ def get_device_status():
             # This is a simplified count - in practice you might want a proper count query
             telemetry_count = len(telemetry_data) if telemetry_data else 0
         except Exception as e:
-            current_app.logger.warning(f"Failed to get telemetry count from InfluxDB: {e}")
+            current_app.logger.warning(f"Failed to get telemetry count from IoTDB: {e}")
         
         response = device.to_dict()
         response['telemetry_count'] = telemetry_count
@@ -137,11 +137,11 @@ def submit_telemetry():
                 'message': 'Telemetry data must be a JSON object'
             }), 400
         
-        # Store only in InfluxDB (telemetry data should not be in SQLite)
+        # Store only in IoTDB (telemetry data should not be in SQLite)
         timestamp = datetime.now(timezone.utc)
         
-        # Store in InfluxDB for time-series analysis
-        influx_success = influx_service.write_telemetry_data(
+        # Store in IoTDB for time-series analysis
+        iotdb_success = iotdb_service.write_telemetry_data(
             device_id=str(device.id),
             data=telemetry_payload,
             device_type=device.device_type,
@@ -149,10 +149,10 @@ def submit_telemetry():
             timestamp=timestamp
         )
         
-        if not influx_success:
+        if not iotdb_success:
             return jsonify({
                 'error': 'Telemetry storage failed',
-                'message': 'Failed to store telemetry data in InfluxDB'
+                'message': 'Failed to store telemetry data in IoTDB'
             }), 500
         
         # Update device last_seen
@@ -160,7 +160,7 @@ def submit_telemetry():
         
         current_app.logger.info(
             f"Telemetry received from device {device.name} (ID: {device.id}) - "
-            f"InfluxDB: ✓"
+            f"IoTDB: ✓"
         )
         
         return jsonify({
@@ -168,7 +168,7 @@ def submit_telemetry():
             'device_id': device.id,
             'device_name': device.name,
             'timestamp': timestamp.isoformat(),
-            'stored_in_influxdb': influx_success
+            'stored_in_iotdb': iotdb_success
         }), 201
         
     except Exception as e:
@@ -190,21 +190,21 @@ def get_telemetry():
         start_time = request.args.get('start_time', '-24h')  # Default to last 24 hours
         data_type = request.args.get('type')
         
-        # Get telemetry data from InfluxDB
+        # Get telemetry data from IoTDB
         try:
-            telemetry_data = influx_service.get_device_telemetry(
+            telemetry_data = iotdb_service.get_device_telemetry(
                 device_id=str(device.id),
                 start_time=start_time,
                 limit=limit
             )
             
-            # Filter by data type if specified (this would need to be implemented in InfluxDB service)
+            # Filter by data type if specified (this would need to be implemented in IoTDB service)
             if data_type and telemetry_data:
-                # Simple filtering - in practice this should be done in the InfluxDB query
+                # Simple filtering - in practice this should be done in the IoTDB query
                 telemetry_data = [record for record in telemetry_data if record.get('data_type') == data_type]
         
         except Exception as e:
-            current_app.logger.error(f"Error querying InfluxDB: {str(e)}")
+            current_app.logger.error(f"Error querying IoTDB: {str(e)}")
             telemetry_data = []
         
         return jsonify({

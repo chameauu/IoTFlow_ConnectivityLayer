@@ -172,7 +172,7 @@ def get_system_stats():
                 'total_configs': total_configs,
                 'active_configs': active_configs
             },
-            'telemetry_note': 'Telemetry data is stored in InfluxDB, not accessible via this API'
+            'telemetry_note': 'Telemetry data is stored in IoTDB, not accessible via this API'
         }), 200
         
     except Exception as e:
@@ -199,7 +199,7 @@ def delete_device(device_id):
             'status': 'success',
             'message': f'Device {device_name} deleted successfully',
             'device_id': device_id,
-            'note': 'Telemetry data in InfluxDB is not automatically deleted'
+            'note': 'Telemetry data in IoTDB is not automatically deleted'
         }), 200
         
     except Exception as e:

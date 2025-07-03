@@ -11,7 +11,7 @@ from typing import Optional, Dict, Any
 from datetime import datetime, timezone
 
 from ..models import Device, DeviceAuth, db
-from ..services.influxdb import InfluxDBService
+from ..services.iotdb import IoTDBService
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 class MQTTAuthService:
     """Service for handling server-side MQTT device authentication and authorization"""
     
-    def __init__(self, influxdb_service: Optional[InfluxDBService] = None, app=None):
-        self.influxdb_service = influxdb_service or InfluxDBService()
+    def __init__(self, iotdb_service: Optional[IoTDBService] = None, app=None):
+        self.iotdb_service = iotdb_service or IoTDBService()
         self.authenticated_devices = {}  # Cache for authenticated devices
         self.app = app  # Flask app instance for context
         
@@ -114,7 +114,7 @@ class MQTTAuthService:
     def handle_telemetry_message(self, device_id: int, api_key: str, topic: str, payload: str) -> bool:
         """
         Handle incoming telemetry message from device with server-side authentication
-        Store data only in InfluxDB
+        Store data only in IoTDB
         """
         if not self.app:
             logger.error("No Flask app instance available for telemetry processing")
@@ -155,8 +155,8 @@ class MQTTAuthService:
                     except ValueError:
                         logger.warning("Invalid timestamp format from device %d: %s", device_id, timestamp_str)
                 
-                # Store in InfluxDB only
-                success = self.influxdb_service.write_telemetry_data(
+                # Store in IoTDB only
+                success = self.iotdb_service.write_telemetry_data(
                     device_id=str(device_id),
                     data=telemetry_data,
                     device_type=device.device_type,
@@ -167,10 +167,10 @@ class MQTTAuthService:
                 if success:
                     # Update device last seen
                     device.update_last_seen()
-                    logger.info("Telemetry stored in InfluxDB for device %s (ID: %d)", device.name, device_id)
+                    logger.info("Telemetry stored in IoTDB for device %s (ID: %d)", device.name, device_id)
                     return True
                 else:
-                    logger.error("Failed to store telemetry in InfluxDB for device %d", device_id)
+                    logger.error("Failed to store telemetry in IoTDB for device %d", device_id)
                     return False
                     
         except Exception as e:

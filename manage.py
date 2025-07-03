@@ -66,13 +66,13 @@ def run_shell():
     with app.app_context():
         # Make common objects available in shell
         from src.models import Device
-        from src.services.influxdb import InfluxDBService
+        from src.services.iotdb import IoTDBService
         
         vars = {
             'app': app,
             'db': db,
             'Device': Device,
-            'influxdb': InfluxDBService()
+            'iotdb': IoTDBService()
         }
         
         code.interact(local=vars)

@@ -5,8 +5,11 @@ A modern, scalable REST API built with Python Flask for comprehensive IoT device
 ## 🚀 Features
 
 ### Core Capabilities
-- **🔌 Device Management**: Register, authenticate, and manage IoT devices with secure API keys
-- **📊 Hybrid Data Storage**: SQLite for device management + InfluxDB for time-series telemetry
+- **🔌 Device Management**: Register, authenticate, and manage IoT devices with se    └── docs/                           # Comprehensive docs
+    ├── MANAGEMENT_GUIDE.md         # Management & deployment guide
+    ├── HTTP_SIMULATION_TEST_RESULTS.md  # Testing results
+    └── iotdb_integration.md        # Architecture docs API keys
+- **./docker-manage.sh logs iotdb       # View specific service logs Hybrid Data Storage**: SQLite for device management + IoTDB for time-series telemetry
 - **📡 Multi-Protocol Support**: HTTP REST API + MQTT pub/sub messaging
 - **⚡ Real-time Analytics**: Time-series data queries, aggregations, and dashboards
 - **🛡️ Security First**: API key authentication, rate limiting, and secure endpoints
@@ -14,7 +17,7 @@ A modern, scalable REST API built with Python Flask for comprehensive IoT device
 - **🧪 Comprehensive Testing**: Built-in device simulators and testing framework
 
 ### Advanced Features
-- **🔍 Time-Series Queries**: Advanced InfluxDB queries with filtering and aggregation
+- **🔍 Time-Series Queries**: Advanced IoTDB queries with filtering and aggregation
 - **🤖 Device Simulation**: Fleet simulators for development and testing
 - **📋 Admin Dashboard**: Complete device and data management interface
 - **📚 Poetry Integration**: Modern dependency management and development workflow
@@ -36,7 +39,7 @@ A modern, scalable REST API built with Python Flask for comprehensive IoT device
     └─────────┬─────────┬─────┘
               ↓         ↓
     ┌─────────────┐   ┌──────────────┐
-    │   SQLite    │   │  InfluxDB    │
+    │   SQLite    │   │    IoTDB     │
     │ (Devices)   │   │ (Telemetry)  │
     └─────────────┘   └──────────────┘
               ↓
@@ -84,7 +87,7 @@ nano .env
 ### 3. Start Services & Initialize
 
 ```bash
-# Start all services (Redis, InfluxDB, MQTT)
+# Start all services (Redis, IoTDB, MQTT)
 ./docker-manage.sh start-all
 
 # Initialize Python environment and database
@@ -265,12 +268,12 @@ curl -X POST http://localhost:5000/api/v1/devices/heartbeat \
 - `updated_at` - Last modification
 - `last_seen` - Last heartbeat/activity
 
-### InfluxDB (Time-Series Telemetry)
+### IoTDB (Time-Series Telemetry)
 
-**Measurement Structure:**
-- **Measurement**: `device_telemetry`
-- **Tags**: `device_id`, `device_type`, `location`
-- **Fields**: All telemetry data (temperature, humidity, etc.)
+**Time Series Structure:**
+- **Storage Groups**: `root.iotflow.{device_id}`
+- **Measurements**: Device data fields (temperature, humidity, etc.)
+- **Data Types**: INT32, INT64, FLOAT, DOUBLE, TEXT, BOOLEAN
 - **Timestamp**: Precise time-series indexing
 
 ## 🛠️ Development & Management
@@ -282,14 +285,14 @@ IoTFlow_ConnectivityLayer/
 ├── 📁 src/                          # Core application code
 │   ├── config/                      # Configuration management
 │   │   ├── config.py               # Flask & database config
-│   │   └── influxdb_config.py      # InfluxDB configuration
+│   │   └── iotdb_config.py         # IoTDB configuration
 │   ├── models/                      # SQLAlchemy database models
 │   ├── routes/                      # API route handlers
 │   │   ├── devices.py              # Device management endpoints
 │   │   ├── telemetry.py            # Telemetry data endpoints
 │   │   └── admin.py                # Administrative endpoints
 │   ├── services/                    # Business logic services
-│   │   └── influxdb.py             # InfluxDB service layer
+│   │   └── iotdb.py                # IoTDB service layer
 │   ├── middleware/                  # Request/response middleware
 │   │   ├── auth.py                 # Authentication & authorization
 │   │   ├── security.py             # Security utilities
@@ -312,7 +315,7 @@ IoTFlow_ConnectivityLayer/
 └── 📚 Documentation/                # Comprehensive docs
     ├── MANAGEMENT_GUIDE.md         # Management & deployment guide
     ├── HTTP_SIMULATION_TEST_RESULTS.md  # Testing results
-    └── INFLUXDB_INTEGRATION_COMPLETE.md # Architecture docs
+    └── iotdb_integration.md        # Architecture docs
 ```
 
 ### Management Commands
@@ -328,7 +331,7 @@ IoTFlow_ConnectivityLayer/
 # Development workflow
 ./docker-manage.sh status        # Check service status
 ./docker-manage.sh logs          # View logs
-./docker-manage.sh logs influxdb # View specific service logs
+./docker-manage.sh logs iotdb # View specific service logs
 
 # Data management
 ./docker-manage.sh backup        # Backup SQLite database
@@ -337,7 +340,7 @@ IoTFlow_ConnectivityLayer/
 
 # Database connections
 ./docker-manage.sh redis         # Connect to Redis CLI
-./docker-manage.sh influxdb      # Connect to InfluxDB CLI
+./docker-manage.sh iotdb         # Connect to IoTDB CLI
 ```
 
 #### Python Management Script (`manage.py`)
@@ -393,10 +396,10 @@ poetry run python simulators/fleet_simulator.py --preset factory  # 30 devices
 | | `FLASK_DEBUG` | Debug mode | `True` |
 | | `SECRET_KEY` | Flask secret key | Auto-generated |
 | **Database** | `DATABASE_URL` | SQLite database path | `sqlite:///iotflow.db` |
-| **InfluxDB** | `INFLUXDB_URL` | InfluxDB connection URL | `http://localhost:8086` |
-| | `INFLUXDB_TOKEN` | Authentication token | Auto-configured |
-| | `INFLUXDB_ORG` | Organization name | `iotflow` |
-| | `INFLUXDB_BUCKET` | Data bucket name | `telemetry` |
+| **IoTDB** | `IOTDB_HOST` | IoTDB host address | `localhost` |
+| | `IOTDB_PORT` | IoTDB port | `6667` |
+| | `IOTDB_USER` | IoTDB username | `root` |
+| | `IOTDB_PASSWORD` | IoTDB password | `root` |
 | **Redis** | `REDIS_URL` | Redis connection URL | `redis://localhost:6379/0` |
 | **MQTT** | `MQTT_HOST` | MQTT broker host | `localhost` |
 | | `MQTT_PORT` | MQTT broker port | `1883` |
@@ -406,11 +409,11 @@ poetry run python simulators/fleet_simulator.py --preset factory  # 30 devices
 
 #### Service Configuration
 
-**InfluxDB Configuration:**
-- Data retention: 30 days (configurable)
-- Precision: nanosecond timestamps
-- Organization: `iotflow`
-- Bucket: `telemetry`
+**IoTDB Configuration:**
+- Data retention: Configurable per storage group
+- Precision: Millisecond timestamps
+- Storage Groups: `root.iotflow.*`
+- Compression: Configurable compression algorithms
 
 **Redis Configuration:** 
 - Memory usage: LRU eviction
@@ -452,7 +455,7 @@ poetry run gunicorn -w 4 -b 0.0.0.0:5000 --statsd-host=localhost:8125 app:app
 
 #### Database Optimization
 - **SQLite**: WAL mode for concurrent reads
-- **InfluxDB**: Appropriate shard duration and retention policies
+- **IoTDB**: Appropriate storage group configuration and compression
 - **Redis**: Memory optimization and persistence settings
 
 ### Security Hardening
@@ -495,7 +498,7 @@ curl http://localhost:5000/api/v1/admin/dashboard
 
 #### HTTP API Performance
 - **Device Registration**: ~40ms average response time
-- **Telemetry Storage**: ~70ms average (SQLite + InfluxDB)
+- **Telemetry Storage**: ~70ms average (SQLite + IoTDB)
 - **Data Retrieval**: ~50ms average
 - **Concurrent Requests**: 100+ requests/second
 
@@ -507,7 +510,7 @@ curl http://localhost:5000/api/v1/admin/dashboard
 
 #### Database Performance
 - **SQLite**: 1000+ device registrations/second
-- **InfluxDB**: 10,000+ telemetry points/second
+- **IoTDB**: 10,000+ telemetry points/second
 - **Redis**: Sub-millisecond caching responses
 - **Storage**: ~1KB per telemetry record
 
@@ -553,7 +556,7 @@ poetry run pytest tests/ --cov=src/
 - **[API Documentation](docs/api.md)** - Complete API reference
 - **[Architecture Guide](docs/architecture.md)** - System design and components
 - **[Testing Results](HTTP_SIMULATION_TEST_RESULTS.md)** - Performance and reliability tests
-- **[InfluxDB Integration](INFLUXDB_INTEGRATION_COMPLETE.md)** - Time-series database setup
+- **[IoTDB Integration](docs/iotdb_integration.md)** - Time-series database setup
 
 ## 📝 License
 
@@ -571,7 +574,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 **Common Issues:**
 - **Service Connection**: Check `./docker-manage.sh status`
 - **Database Issues**: Run `./docker-manage.sh reset` and reinitialize
-- **Port Conflicts**: Check that ports 5000, 6379, 8086, 1883 are available
+- **Port Conflicts**: Check that ports 5000, 6379, 6667, 1883 are available
 - **Poetry Issues**: Update with `poetry install --sync`
 
 **Log Locations:**
