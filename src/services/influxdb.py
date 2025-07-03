@@ -4,6 +4,9 @@ from influxdb_client import Point
 from influxdb_client.client.exceptions import InfluxDBError
 from src.config.influxdb_config import influx_config
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 class InfluxDBService:
     def __init__(self):
@@ -24,18 +27,24 @@ class InfluxDBService:
         """
         Write telemetry data to InfluxDB
         """
+        logger.debug(f"Writing telemetry data - device_id={device_id}, data={data}, metadata={metadata}")
+        
         if not self.is_available():
-            print("InfluxDB is not available")
+            logger.warning("InfluxDB is not available")
             return False
             
         try:
             if timestamp is None:
                 timestamp = datetime.now(timezone.utc)
             
+            logger.debug(f"Using timestamp: {timestamp}")
+            
             # Create a point for each telemetry field
             points = []
             
             for field_name, field_value in data.items():
+                logger.debug(f"Processing field {field_name}={field_value} (type: {type(field_value)})")
+                
                 if isinstance(field_value, (int, float)):
                     # Numeric values go as fields
                     point = Point("telemetry") \
@@ -51,6 +60,7 @@ class InfluxDBService:
                                 point = point.tag(f"meta_{meta_key}", str(meta_value))
                     
                     points.append(point)
+                    logger.debug(f"Added numeric point for {field_name}")
                     
                 elif isinstance(field_value, str):
                     # String values as tags with a dummy field
@@ -68,6 +78,7 @@ class InfluxDBService:
                                 point = point.tag(f"meta_{meta_key}", str(meta_value))
                     
                     points.append(point)
+                    logger.debug(f"Added string point for {field_name}")
                     
                 elif isinstance(field_value, bool):
                     # Boolean values as fields (converted to int)
@@ -84,20 +95,23 @@ class InfluxDBService:
                                 point = point.tag(f"meta_{meta_key}", str(meta_value))
                     
                     points.append(point)
+                    logger.debug(f"Added boolean point for {field_name}")
             
             # Write all points
             if points:
+                logger.debug(f"Writing {len(points)} points to InfluxDB")
                 self.write_api.write(bucket=self.bucket, org=self.org, record=points)
+                logger.debug(f"Successfully wrote {len(points)} points to InfluxDB")
                 return True
             else:
-                print("No valid data points to write")
+                logger.warning("No valid data points to write")
                 return False
             
         except InfluxDBError as e:
-            print(f"InfluxDB write error: {e}")
+            logger.error(f"InfluxDB write error: {e}")
             return False
         except Exception as e:
-            print(f"Unexpected error writing to InfluxDB: {e}")
+            logger.error(f"Unexpected error writing to InfluxDB: {e}")
             return False
 
     def get_device_telemetry(self, device_id: str, start_time: str = "-1h", 
@@ -152,10 +166,10 @@ class InfluxDBService:
             return telemetry_data
             
         except InfluxDBError as e:
-            print(f"InfluxDB query error: {e}")
+            logger.error(f"InfluxDB query error: {e}")
             return []
         except Exception as e:
-            print(f"Unexpected error querying InfluxDB: {e}")
+            logger.error(f"Unexpected error querying InfluxDB: {e}")
             return []
 
     def get_device_latest_telemetry(self, device_id: str) -> Optional[Dict[str, Any]]:
@@ -207,7 +221,7 @@ class InfluxDBService:
             return None
             
         except Exception as e:
-            print(f"Error getting latest telemetry: {e}")
+            logger.error(f"Error getting latest telemetry: {e}")
             return None
 
     def get_device_aggregated_data(self, device_id: str, field: str, 

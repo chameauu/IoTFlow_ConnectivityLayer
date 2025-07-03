@@ -1,10 +1,13 @@
 from flask import Blueprint, request, jsonify, current_app
 from datetime import datetime, timezone
-from src.services.influxdb import influx_service
+from src.services.influxdb import InfluxDBService
 from src.models import Device, db
 
 # Create blueprint for telemetry routes
 telemetry_bp = Blueprint('telemetry', __name__, url_prefix='/api/v1/telemetry')
+
+# Initialize InfluxDB service
+influx_service = InfluxDBService()
 
 @telemetry_bp.route('', methods=['POST'])
 def store_telemetry():

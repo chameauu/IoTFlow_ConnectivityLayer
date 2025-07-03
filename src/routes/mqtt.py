@@ -470,3 +470,86 @@ def get_mqtt_metrics():
             'error': 'Failed to get MQTT metrics',
             'message': str(e)
         }), 500
+
+
+@mqtt_bp.route('/telemetry/<int:device_id>', methods=['POST'])
+@security_headers_middleware()
+@request_metrics_middleware()
+@input_sanitization_middleware()
+def mqtt_telemetry(device_id):
+    """
+    MQTT Telemetry endpoint with API key authentication
+    This endpoint accepts telemetry data from devices and validates API key server-side
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        # Get API key from headers
+        api_key = request.headers.get('X-API-Key')
+        if not api_key:
+            return jsonify({
+                'error': 'API key required',
+                'message': 'Include X-API-Key header with your device API key'
+            }), 401
+        
+        # Get MQTT auth service
+        mqtt_auth_service = getattr(current_app, 'mqtt_auth_service', None)
+        if not mqtt_auth_service:
+            return jsonify({
+                'error': 'MQTT authentication service not available'
+            }), 503
+        
+        # Validate device and API key
+        device = mqtt_auth_service.authenticate_device_by_api_key(api_key)
+        if not device or device.id != device_id:
+            return jsonify({
+                'error': 'Invalid API key or device ID mismatch',
+                'device_id': device_id
+            }), 401
+        
+        # Extract telemetry data
+        telemetry_data = data.get('data', {})
+        metadata = data.get('metadata', {})
+        timestamp_str = data.get('timestamp')
+        
+        if not telemetry_data:
+            return jsonify({
+                'error': 'Telemetry data is required',
+                'message': 'Include "data" field with sensor readings'
+            }), 400
+        
+        # Create MQTT topic for telemetry
+        topic = f"iotflow/devices/{device_id}/telemetry"
+        
+        # Handle telemetry message through MQTT auth service
+        success = mqtt_auth_service.handle_telemetry_message(
+            device_id=device_id,
+            api_key=api_key,
+            topic=topic,
+            payload=json.dumps(data)
+        )
+        
+        if success:
+            return jsonify({
+                'status': 'success',
+                'message': 'Telemetry data processed successfully',
+                'device_id': device_id,
+                'device_name': device.name,
+                'topic': topic,
+                'timestamp': timestamp_str or datetime.utcnow().isoformat()
+            }), 201
+        else:
+            return jsonify({
+                'error': 'Failed to process telemetry data',
+                'message': 'Check device authorization and data format'
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"Error processing MQTT telemetry: {e}")
+        return jsonify({
+            'error': 'Internal server error',
+            'message': 'Failed to process telemetry data'
+        }), 500

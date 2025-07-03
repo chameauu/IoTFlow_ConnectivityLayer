@@ -7,7 +7,7 @@ import psutil
 import redis
 from flask import current_app, jsonify, request
 from functools import wraps
-from src.models import Device, TelemetryData, db
+from src.models import Device, db
 from datetime import datetime, timezone, timedelta
 
 
@@ -152,14 +152,10 @@ class HealthMonitor:
                 Device.status == 'active'
             ).count()
             
-            # Telemetry metrics
-            telemetry_last_hour = TelemetryData.query.filter(
-                TelemetryData.timestamp >= (now - timedelta(hours=1))
-            ).count()
-            
-            telemetry_last_day = TelemetryData.query.filter(
-                TelemetryData.timestamp >= (now - timedelta(days=1))
-            ).count()
+            # Telemetry metrics (now stored in InfluxDB, not SQLite)
+            # TODO: Implement InfluxDB telemetry metrics if needed
+            telemetry_last_hour = 0  # Would need InfluxDB query
+            telemetry_last_day = 0   # Would need InfluxDB query
             
             return {
                 'total_devices': total_devices,

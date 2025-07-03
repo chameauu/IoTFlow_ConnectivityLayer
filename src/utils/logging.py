@@ -33,6 +33,12 @@ def setup_logging(app):
     console_handler.setLevel(log_level)
     console_handler.setFormatter(formatter)
     
+    # Configure root logger to capture all loggers
+    root_logger = logging.getLogger()
+    root_logger.setLevel(log_level)
+    root_logger.addHandler(file_handler)
+    root_logger.addHandler(console_handler)
+    
     # Configure app logger
     app.logger.setLevel(log_level)
     app.logger.addHandler(file_handler)
@@ -42,6 +48,12 @@ def setup_logging(app):
     werkzeug_logger = logging.getLogger('werkzeug')
     werkzeug_logger.setLevel(log_level)
     werkzeug_logger.addHandler(file_handler)
+    
+    # Configure MQTT logger specifically
+    mqtt_logger = logging.getLogger('src.mqtt.client')
+    mqtt_logger.setLevel(log_level)
+    mqtt_logger.addHandler(file_handler)
+    mqtt_logger.addHandler(console_handler)
     
     return app.logger
 

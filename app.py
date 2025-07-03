@@ -13,6 +13,7 @@ from src.utils.logging import setup_logging
 from src.middleware.monitoring import HealthMonitor
 from src.middleware.security import comprehensive_error_handler, security_headers_middleware
 from src.mqtt.client import create_mqtt_service
+from src.services.mqtt_auth import MQTTAuthService
 
 def create_app(config_name=None):
     """Application factory pattern"""
@@ -59,195 +60,34 @@ def create_app(config_name=None):
     app.register_blueprint(mqtt_bp)
     app.register_blueprint(telemetry_bp)
     
-    # Initialize MQTT service
+    # Initialize MQTT service with authentication
     try:
         # Get MQTT config from the config object
         config_obj = config[config_name or 'development']()
-        mqtt_service = create_mqtt_service(config_obj.mqtt_config)
+        
+        # Initialize MQTT authentication service with app context
+        mqtt_auth_service = MQTTAuthService(app=app)
+        
+        # Create MQTT service with authentication
+        mqtt_service = create_mqtt_service(config_obj.mqtt_config, mqtt_auth_service)
         app.mqtt_service = mqtt_service
+        app.mqtt_auth_service = mqtt_auth_service
         
         # Connect to MQTT broker
         if mqtt_service.connect():
             app.logger.info("MQTT service initialized and connected successfully")
             
-            # Add telemetry callback to store data in database
-            def handle_telemetry_data(telemetry_data):
-                """Handle incoming telemetry data with authentication"""
-                try:
-                    app.logger.info(f"Received MQTT telemetry: {telemetry_data}")
-                    
-                    # Check if data is in nested format (from MQTT client handler)
-                    if 'data' in telemetry_data and isinstance(telemetry_data['data'], dict):
-                        # Extract from nested structure
-                        payload = telemetry_data['data']
-                        device_id = payload.get('device_id') or telemetry_data.get('device_id')
-                        device_type = payload.get('device_type', 'unknown')
-                        measurements = payload.get('measurements', {})
-                        status = payload.get('status', {})
-                        metadata = payload.get('metadata', {})
-                        timestamp = payload.get('timestamp') or telemetry_data.get('timestamp')
-                        api_key = payload.get('api_key') or telemetry_data.get('api_key')
-                        
-                        app.logger.info(f"Processing nested MQTT payload: {payload}")
-                    else:
-                        # Extract data directly from telemetry payload
-                        device_id = telemetry_data.get('device_id')
-                        device_type = telemetry_data.get('device_type', 'unknown')
-                        measurements = telemetry_data.get('measurements', {})
-                        status = telemetry_data.get('status', {})
-                        metadata = telemetry_data.get('metadata', {})
-                        timestamp = telemetry_data.get('timestamp')
-                        api_key = telemetry_data.get('api_key')
-                    
-                    # Validate required fields
-                    if not device_id or not measurements:
-                        app.logger.warning("Invalid MQTT telemetry data: missing device_id or measurements")
-                        return
-                    
-                    # SECURITY CHECK: Validate device is registered and API key is correct
-                    with app.app_context():
-                        from src.models import Device
-                        
-                        # Method 1: If API key is provided, authenticate with it
-                        if api_key:
-                            device = Device.query.filter_by(api_key=api_key).first()
-                            if not device:
-                                app.logger.warning(f"MQTT Authentication failed: Invalid API key for device_id {device_id}")
-                                return
-                            if device.status != 'active':
-                                app.logger.warning(f"MQTT Authentication failed: Device {device_id} is {device.status}")
-                                return
-                            # Ensure device_id matches
-                            if str(device.id) != str(device_id):
-                                app.logger.warning(f"MQTT Authentication failed: Device ID mismatch. API key belongs to device {device.id}, but device_id {device_id} was provided")
-                                return
-                        
-                        # Method 2: If no API key, check if device_id exists and is registered
-                        else:
-                            device = Device.query.filter_by(id=device_id).first()
-                            if not device:
-                                app.logger.warning(f"MQTT Authentication failed: Device {device_id} not registered in database")
-                                return
-                            if device.status != 'active':
-                                app.logger.warning(f"MQTT Authentication failed: Device {device_id} is {device.status}")
-                                return
-                        
-                        # Update device last_seen timestamp
-                        device.update_last_seen()
-                        app.logger.info(f"MQTT Authentication successful for device {device.name} (ID: {device.id})")
-                    
-                    # Store in InfluxDB
-                    if not device_id or not measurements:
-                        app.logger.warning("Invalid MQTT telemetry data: missing device_id or measurements")
-                        return
-                    
-                    # Store in InfluxDB
-                    from src.services.influxdb import InfluxDBService
-                    influx_service = InfluxDBService()
-                    
-                    # Store measurements
-                    influx_success = influx_service.write_telemetry_data(
-                        device_id=device_id,
-                        data=measurements,
-                        device_type=device_type,
-                        metadata=metadata,
-                        timestamp=timestamp
-                    )
-                    
-                    # Store status data if present
-                    if status and isinstance(status, dict):
-                        influx_service.write_telemetry_data(
-                            device_id=device_id,
-                            data=status,
-                            device_type=device_type,
-                            metadata={"data_type": "status", **metadata} if metadata else {"data_type": "status"},
-                            timestamp=timestamp
-                        )
-                    
-                    if influx_success:
-                        app.logger.info(f"MQTT telemetry data for {device_id} stored in InfluxDB")
-                    else:
-                        app.logger.warning(f"Failed to store MQTT telemetry for {device_id} in InfluxDB")
-                        
-                except Exception as e:
-                    app.logger.error(f"Error processing MQTT telemetry: {e}")
+            # Subscribe to device topics for server-side processing
+            mqtt_service.subscribe_to_system_topics()
             
-            # Add status callback to update device status
-            def handle_device_status(status_data):
-                """Handle device status updates with authentication"""
-                try:
-                    app.logger.info(f"Received device status update: {status_data}")
-                    
-                    # Extract data
-                    device_id = status_data.get('device_id')
-                    status = status_data.get('status')
-                    api_key = status_data.get('api_key')
-                    
-                    if not device_id or not status:
-                        app.logger.warning("Invalid status update: missing device_id or status")
-                        return
-                    
-                    # SECURITY CHECK: Validate device is registered
-                    with app.app_context():
-                        from src.models import Device
-                        
-                        # Method 1: If API key is provided, authenticate with it
-                        if api_key:
-                            device = Device.query.filter_by(api_key=api_key).first()
-                            if not device:
-                                app.logger.warning(f"MQTT Status Authentication failed: Invalid API key for device_id {device_id}")
-                                return
-                            if str(device.id) != str(device_id):
-                                app.logger.warning(f"MQTT Status Authentication failed: Device ID mismatch")
-                                return
-                        
-                        # Method 2: If no API key, check if device_id exists and is registered
-                        else:
-                            device = Device.query.filter_by(id=device_id).first()
-                            if not device:
-                                app.logger.warning(f"MQTT Status Authentication failed: Device {device_id} not registered")
-                                return
-                        
-                        # Update device last_seen timestamp
-                        device.update_last_seen()
-                        app.logger.info(f"MQTT Status Authentication successful for device {device.name}")
-                    
-                    # Store status in InfluxDB
-                    from src.services.influxdb import InfluxDBService
-                    influx_service = InfluxDBService()
-                    
-                    # Create a data point for the status
-                    from datetime import datetime
-                    status_data = {
-                        "status": status,
-                        "updated_at": datetime.now().isoformat()
-                    }
-                    
-                    influx_success = influx_service.write_telemetry_data(
-                        device_id=device_id,
-                        data=status_data,
-                        device_type="device_status",
-                        metadata={"data_type": "device_status"},
-                    )
-                    
-                    if influx_success:
-                        app.logger.info(f"Device status for {device_id} updated to {status}")
-                    else:
-                        app.logger.warning(f"Failed to update status for device {device_id}")
-                        
-                except Exception as e:
-                    app.logger.error(f"Error processing device status: {e}")
-            
-            # Register callbacks
-            mqtt_service.add_telemetry_callback(handle_telemetry_data)
-            mqtt_service.add_status_callback(handle_device_status)
-            
+            app.logger.info("MQTT authentication service initialized")
         else:
-            app.logger.warning("Failed to connect to MQTT broker")
+            app.logger.error("Failed to connect to MQTT broker")
             
     except Exception as e:
-        app.logger.error(f"Failed to initialize MQTT service: {str(e)}")
+        app.logger.error(f"MQTT service initialization failed: {str(e)}")
         app.mqtt_service = None
+        app.mqtt_auth_service = None
     
     # Enhanced health check endpoint
     @app.route('/health', methods=['GET'])

@@ -294,7 +294,8 @@ class MQTTTopicManager:
     def get_wildcard_patterns(cls) -> Dict[str, str]:
         """Get wildcard subscription patterns for different purposes"""
         patterns = {
-            "all_device_telemetry": f"{cls.BASE_TOPIC}/devices/+/telemetry/+",
+            "all_device_telemetry": f"{cls.BASE_TOPIC}/devices/+/telemetry",  # Main telemetry topic
+            "all_device_telemetry_sub": f"{cls.BASE_TOPIC}/devices/+/telemetry/+",  # Sub-telemetry topics
             "all_device_status": f"{cls.BASE_TOPIC}/devices/+/status/+",
             "all_device_commands": f"{cls.BASE_TOPIC}/devices/+/commands/+",
             "all_fleet_commands": f"{cls.BASE_TOPIC}/fleet/commands/+",

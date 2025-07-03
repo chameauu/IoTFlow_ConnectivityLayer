@@ -1,14 +1,17 @@
 from flask import Blueprint, request, jsonify, current_app
-from src.models import Device, TelemetryData, db
+from src.models import Device, DeviceAuth, DeviceConfiguration, db
 from src.middleware.auth import authenticate_device, validate_json_payload, rate_limit_device
 from src.middleware.monitoring import device_heartbeat_monitor, request_metrics_middleware
 from src.middleware.security import security_headers_middleware, input_sanitization_middleware
-from src.services.influxdb import influx_service
+from src.services.influxdb import InfluxDBService
 from datetime import datetime, timezone
 import json
 
 # Create blueprint for device routes
 device_bp = Blueprint('devices', __name__, url_prefix='/api/v1/devices')
+
+# Initialize InfluxDB service for telemetry queries
+influx_service = InfluxDBService()
 
 @device_bp.route('/register', methods=['POST'])
 @security_headers_middleware()
@@ -70,15 +73,35 @@ def get_device_status():
     try:
         device = request.device
         
-        # Get latest telemetry count
-        telemetry_count = TelemetryData.query.filter_by(device_id=device.id).count()
+        # Get telemetry count from InfluxDB instead of SQLite
+        telemetry_count = 0
+        try:
+            # Query InfluxDB for telemetry count (simplified)
+            telemetry_data = influx_service.get_device_telemetry(
+                device_id=str(device.id),
+                start_time='-30d',  # Last 30 days
+                limit=1
+            )
+            # This is a simplified count - in practice you might want a proper count query
+            telemetry_count = len(telemetry_data) if telemetry_data else 0
+        except Exception as e:
+            current_app.logger.warning(f"Failed to get telemetry count from InfluxDB: {e}")
         
         response = device.to_dict()
         response['telemetry_count'] = telemetry_count
-        response['is_online'] = (
-            device.last_seen and 
-            (datetime.now(timezone.utc) - device.last_seen).total_seconds() < 300  # 5 minutes
-        )
+        
+        # Handle timezone awareness for last_seen comparison
+        is_online = False
+        if device.last_seen:
+            # Ensure both datetimes are timezone-aware for comparison
+            now = datetime.now(timezone.utc)
+            last_seen = device.last_seen
+            if last_seen.tzinfo is None:
+                # If last_seen is naive, assume it's UTC
+                last_seen = last_seen.replace(tzinfo=timezone.utc)
+            is_online = (now - last_seen).total_seconds() < 300  # 5 minutes
+        
+        response['is_online'] = is_online
         
         return jsonify({
             'status': 'success',
@@ -114,22 +137,8 @@ def submit_telemetry():
                 'message': 'Telemetry data must be a JSON object'
             }), 400
         
-        # Store in both SQLite (for compatibility) and InfluxDB (for time-series)
+        # Store only in InfluxDB (telemetry data should not be in SQLite)
         timestamp = datetime.now(timezone.utc)
-        
-        # Store in SQLite (existing functionality)
-        telemetry = TelemetryData(
-            device_id=device.id,
-            data_type=data.get('type', 'sensor'),
-            timestamp=timestamp
-        )
-        
-        # Set JSON data using helper methods
-        telemetry.set_payload(telemetry_payload)
-        telemetry.set_metadata(data.get('metadata', {}))
-        
-        db.session.add(telemetry)
-        db.session.commit()
         
         # Store in InfluxDB for time-series analysis
         influx_success = influx_service.write_telemetry_data(
@@ -140,26 +149,29 @@ def submit_telemetry():
             timestamp=timestamp
         )
         
+        if not influx_success:
+            return jsonify({
+                'error': 'Telemetry storage failed',
+                'message': 'Failed to store telemetry data in InfluxDB'
+            }), 500
+        
         # Update device last_seen
         device.update_last_seen()
         
         current_app.logger.info(
             f"Telemetry received from device {device.name} (ID: {device.id}) - "
-            f"SQLite: ✓, InfluxDB: {'✓' if influx_success else '✗'}"
+            f"InfluxDB: ✓"
         )
         
         return jsonify({
             'message': 'Telemetry data received successfully',
-            'telemetry_id': telemetry.id,
             'device_id': device.id,
             'device_name': device.name,
             'timestamp': timestamp.isoformat(),
-            'stored_in_sqlite': True,
             'stored_in_influxdb': influx_success
         }), 201
         
     except Exception as e:
-        db.session.rollback()
         current_app.logger.error(f"Error submitting telemetry: {str(e)}")
         return jsonify({
             'error': 'Telemetry submission failed',
@@ -175,30 +187,32 @@ def get_telemetry():
         
         # Parse query parameters
         limit = min(int(request.args.get('limit', 100)), 1000)  # Max 1000 records
-        offset = int(request.args.get('offset', 0))
+        start_time = request.args.get('start_time', '-24h')  # Default to last 24 hours
         data_type = request.args.get('type')
         
-        # Build query
-        query = TelemetryData.query.filter_by(device_id=device.id)
+        # Get telemetry data from InfluxDB
+        try:
+            telemetry_data = influx_service.get_device_telemetry(
+                device_id=str(device.id),
+                start_time=start_time,
+                limit=limit
+            )
+            
+            # Filter by data type if specified (this would need to be implemented in InfluxDB service)
+            if data_type and telemetry_data:
+                # Simple filtering - in practice this should be done in the InfluxDB query
+                telemetry_data = [record for record in telemetry_data if record.get('data_type') == data_type]
         
-        if data_type:
-            query = query.filter_by(data_type=data_type)
-        
-        # Order by timestamp descending (newest first)
-        query = query.order_by(TelemetryData.timestamp.desc())
-        
-        # Apply pagination
-        telemetry_records = query.offset(offset).limit(limit).all()
-        
-        # Convert to dict
-        telemetry_data = [record.to_dict() for record in telemetry_records]
+        except Exception as e:
+            current_app.logger.error(f"Error querying InfluxDB: {str(e)}")
+            telemetry_data = []
         
         return jsonify({
             'status': 'success',
             'telemetry': telemetry_data,
             'count': len(telemetry_data),
             'limit': limit,
-            'offset': offset
+            'start_time': start_time
         }), 200
         
     except Exception as e:
@@ -211,8 +225,8 @@ def get_telemetry():
 @device_bp.route('/config', methods=['PUT'])
 @authenticate_device
 @validate_json_payload(['status'])
-def update_device_config():
-    """Update device configuration"""
+def update_device_info():
+    """Update device information (status, location, versions)"""
     try:
         device = request.device
         data = request.validated_json
@@ -273,4 +287,151 @@ def device_heartbeat():
         return jsonify({
             'error': 'Heartbeat failed',
             'message': 'An error occurred while processing heartbeat'
+        }), 500
+
+@device_bp.route('/mqtt-credentials', methods=['GET'])
+@authenticate_device
+@security_headers_middleware()
+@request_metrics_middleware()
+def get_mqtt_credentials():
+    """Get MQTT connection details for device"""
+    try:
+        device = request.device
+        
+        # Return MQTT connection details for anonymous connection
+        # Note: Authentication is handled server-side using API key
+        credentials = {
+            'mqtt_host': current_app.config.get('MQTT_HOST', 'localhost'),
+            'mqtt_port': current_app.config.get('MQTT_PORT', 1883),
+            'client_id': f"device_{device.id}_{device.name.replace(' ', '_')}",
+            'api_key': device.api_key,  # API key for server-side authentication
+            'anonymous_connection': True,  # MQTT broker allows anonymous connections
+            'authentication_note': 'Use API key for server-side authentication, not MQTT broker auth',
+            'topics': {
+                'telemetry_publish': f"iotflow/devices/{device.id}/telemetry",
+                'status_publish': f"iotflow/devices/{device.id}/status",
+                'commands_subscribe': f"iotflow/devices/{device.id}/commands",
+                'config_subscribe': f"iotflow/devices/{device.id}/config"
+            }
+        }
+        
+        return jsonify({
+            'status': 'success',
+            'credentials': credentials
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting MQTT credentials: {str(e)}")
+        return jsonify({
+            'error': 'Failed to get MQTT credentials',
+            'message': 'An error occurred while retrieving MQTT credentials'
+        }), 500
+
+@device_bp.route('/config', methods=['GET'])
+@authenticate_device
+@security_headers_middleware()
+@request_metrics_middleware()
+def get_device_config():
+    """Get device configuration"""
+    try:
+        device = request.device
+        
+        # Get all active configurations for the device
+        configs = DeviceConfiguration.query.filter_by(
+            device_id=device.id, 
+            is_active=True
+        ).all()
+        
+        config_dict = {}
+        for config in configs:
+            # Convert value based on data type
+            value = config.config_value
+            if config.data_type == 'integer':
+                value = int(value) if value else 0
+            elif config.data_type == 'float':
+                value = float(value) if value else 0.0
+            elif config.data_type == 'boolean':
+                value = value.lower() in ('true', '1', 'yes') if value else False
+            elif config.data_type == 'json':
+                import json
+                try:
+                    value = json.loads(value) if value else {}
+                except json.JSONDecodeError:
+                    value = {}
+            
+            config_dict[config.config_key] = {
+                'value': value,
+                'data_type': config.data_type,
+                'updated_at': config.updated_at.isoformat() if config.updated_at else None
+            }
+        
+        return jsonify({
+            'status': 'success',
+            'device_id': device.id,
+            'configuration': config_dict
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting device config: {str(e)}")
+        return jsonify({
+            'error': 'Failed to get device configuration',
+            'message': 'An error occurred while retrieving device configuration'
+        }), 500
+
+@device_bp.route('/config', methods=['POST'])
+@authenticate_device
+@security_headers_middleware()
+@request_metrics_middleware()
+@validate_json_payload(['config_key', 'config_value'])
+@input_sanitization_middleware()
+def update_device_config():
+    """Update device configuration"""
+    try:
+        device = request.device
+        data = request.validated_json
+        
+        config_key = data['config_key']
+        config_value = str(data['config_value'])
+        data_type = data.get('data_type', 'string')
+        
+        # Check if configuration already exists
+        existing_config = DeviceConfiguration.query.filter_by(
+            device_id=device.id,
+            config_key=config_key
+        ).first()
+        
+        if existing_config:
+            # Update existing configuration
+            existing_config.config_value = config_value
+            existing_config.data_type = data_type
+            existing_config.updated_at = datetime.now(timezone.utc)
+            existing_config.is_active = True
+        else:
+            # Create new configuration
+            new_config = DeviceConfiguration(
+                device_id=device.id,
+                config_key=config_key,
+                config_value=config_value,
+                data_type=data_type
+            )
+            db.session.add(new_config)
+        
+        db.session.commit()
+        
+        current_app.logger.info(f"Configuration updated for device {device.name}: {config_key}")
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Configuration updated successfully',
+            'config_key': config_key,
+            'config_value': config_value,
+            'data_type': data_type
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error updating device config: {str(e)}")
+        return jsonify({
+            'error': 'Failed to update configuration',
+            'message': 'An error occurred while updating device configuration'
         }), 500

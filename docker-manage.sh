@@ -236,6 +236,52 @@ restore() {
     fi
 }
 
+# Update MQTT authentication files and restart mosquitto
+update_mqtt_auth() {
+    log_step "Updating MQTT authentication files..."
+    
+    # Generate MQTT authentication files
+    log_info "Generating MQTT password and ACL files..."
+    if poetry run python scripts/mqtt_auth_generator.py both; then
+        log_info "MQTT authentication files generated successfully"
+    else
+        log_error "Failed to generate MQTT authentication files"
+        return 1
+    fi
+    
+    # Restart mosquitto container to reload auth files
+    log_info "Restarting mosquitto container to reload authentication..."
+    if docker compose restart mosquitto; then
+        log_info "Mosquitto restarted successfully"
+        
+        # Wait for mosquitto to be ready
+        sleep 3
+        if docker compose ps mosquitto | grep -q "Up"; then
+            log_info "MQTT broker is ready with updated authentication"
+        else
+            log_warn "MQTT broker may not be running properly after restart"
+        fi
+    else
+        log_error "Failed to restart mosquitto container"
+        return 1
+    fi
+    
+    log_info "MQTT authentication update completed"
+}
+
+# Initialize app with MQTT auth setup
+init_app_with_auth() {
+    log_step "Initializing application with MQTT authentication..."
+    
+    # First initialize the app
+    init_app
+    
+    # Then update MQTT auth
+    update_mqtt_auth
+    
+    log_info "Application initialization with MQTT authentication completed"
+}
+
 # Main script
 case "$1" in
     "start")
@@ -252,6 +298,16 @@ case "$1" in
         check_docker
         check_docker_compose
         init_app
+        ;;
+    "init-app-auth")
+        check_docker
+        check_docker_compose
+        init_app_with_auth
+        ;;
+    "update-mqtt-auth")
+        check_docker
+        check_docker_compose
+        update_mqtt_auth
         ;;
     "run")
         run_app
@@ -291,30 +347,32 @@ case "$1" in
         ;;
     *)
         echo "IoT Connectivity Layer - Docker Management"
-        echo "Usage: $0 {start|start-all|init-app|run|test|stop|restart|status|logs|reset|redis|influxdb|backup|restore}"
+        echo "Usage: $0 {start|start-all|init-app|init-app-auth|update-mqtt-auth|run|test|stop|restart|status|logs|reset|redis|influxdb|backup|restore}"
         echo ""
         echo "Commands:"
-        echo "  start      - Start Redis, InfluxDB, and MQTT services"
-        echo "  start-all  - Start all services"
-        echo "  init-app   - Initialize Python environment and SQLite database"
-        echo "  run        - Run Flask application (uses Poetry)"
-        echo "  test       - Run application tests (uses Poetry)"
-        echo "  stop       - Stop all services"
-        echo "  restart    - Restart services"
-        echo "  status     - Show service status"
-        echo "  logs       - Show logs (optionally for specific service)"
-        echo "  reset      - Reset all data (DANGEROUS!)"
-        echo "  redis      - Connect to Redis CLI"
-        echo "  influxdb   - Connect to InfluxDB CLI"
-        echo "  backup     - Create SQLite database backup"
-        echo "  restore    - Restore SQLite database from backup"
+        echo "  start           - Start Redis, InfluxDB, and MQTT services"
+        echo "  start-all       - Start all services"
+        echo "  init-app        - Initialize Python environment and SQLite database"
+        echo "  init-app-auth   - Initialize app and setup MQTT authentication"
+        echo "  update-mqtt-auth - Update MQTT authentication files and restart mosquitto"
+        echo "  run             - Run Flask application (uses Poetry)"
+        echo "  test            - Run application tests (uses Poetry)"
+        echo "  stop            - Stop all services"
+        echo "  restart         - Restart services"
+        echo "  status          - Show service status"
+        echo "  logs            - Show logs (optionally for specific service)"
+        echo "  reset           - Reset all data (DANGEROUS!)"
+        echo "  redis           - Connect to Redis CLI"
+        echo "  influxdb        - Connect to InfluxDB CLI"
+        echo "  backup          - Create SQLite database backup"
+        echo "  restore         - Restore SQLite database from backup"
         echo ""
         echo "Examples:"
-        echo "  $0 start-all          # Start all services"
-        echo "  $0 init-app           # Initialize app and database"
-        echo "  $0 run                # Run Flask app"
-        echo "  $0 logs influxdb      # Show InfluxDB logs"
-        echo "  $0 backup             # Backup SQLite database"
+        echo "  $0 start-all              # Start all services"
+        echo "  $0 init-app-auth          # Initialize app with MQTT auth"
+        echo "  $0 update-mqtt-auth       # Update MQTT authentication"
+        echo "  $0 run                    # Run Flask app"
+        echo "  $0 logs mosquitto         # Show mosquitto logs"
         echo "  $0 restore backup_20250702_120000.db"
         exit 1
         ;;

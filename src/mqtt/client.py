@@ -16,6 +16,7 @@ import paho.mqtt.client as mqtt
 from cryptography.fernet import Fernet
 
 from .topics import MQTTTopicManager, QoSLevel, TopicType
+from ..services.mqtt_auth import MQTTAuthService
 
 
 @dataclass
@@ -106,29 +107,72 @@ class MQTTMessageHandler:
 
 
 class TelemetryMessageHandler(MQTTMessageHandler):
-    """Handles device telemetry messages"""
+    """Handles device telemetry messages with authentication"""
     
-    def __init__(self):
-        super().__init__("iotflow/devices/+/telemetry/+")
+    def __init__(self, auth_service: 'MQTTAuthService' = None):
+        super().__init__("iotflow/devices/+/telemetry")
         self.telemetry_callbacks: List[Callable] = []
+        self.auth_service = auth_service
+    
+    def set_auth_service(self, auth_service: 'MQTTAuthService'):
+        """Set the authentication service"""
+        self.auth_service = auth_service
     
     def add_telemetry_callback(self, callback: Callable):
         """Add a callback for telemetry data"""
         self.telemetry_callbacks.append(callback)
     
     def handle_message(self, message: MQTTMessage) -> None:
-        """Process telemetry message"""
+        """
+        Process telemetry message with server-side API key authentication
+        Expected payload format: {"api_key": "device_api_key", "data": {...}, "metadata": {...}, "timestamp": "..."}
+        """
         try:
             # Parse topic to extract device info
-            parsed_topic = MQTTTopicManager.parse_topic(message.topic)
-            if not parsed_topic:
-                self.logger.warning(f"Invalid telemetry topic: {message.topic}")
+            topic_parts = message.topic.split("/")
+            if len(topic_parts) < 4 or topic_parts[0] != "iotflow" or topic_parts[1] != "devices" or topic_parts[3] != "telemetry":
+                self.logger.warning("Invalid telemetry topic format: %s", message.topic)
                 return
             
-            device_id = parsed_topic.get("device_id")
-            subtopic = parsed_topic.get("subtopic")
+            try:
+                device_id = int(topic_parts[2])
+            except ValueError:
+                self.logger.warning("Invalid device ID in topic: %s", message.topic)
+                return
             
-            # Parse payload
+            # Parse payload to extract API key and data
+            if isinstance(message.payload, (str, bytes)):
+                try:
+                    payload_data = json.loads(message.payload)
+                except json.JSONDecodeError:
+                    self.logger.error("Invalid JSON payload in telemetry message: %s", message.payload)
+                    return
+            else:
+                payload_data = message.payload
+            
+            # Extract API key from payload
+            api_key = payload_data.get('api_key')
+            if not api_key:
+                self.logger.warning("Missing API key in telemetry payload for device %d", device_id)
+                return
+            
+            # Check if authentication service is available and authenticate
+            if self.auth_service:
+                success = self.auth_service.handle_telemetry_message(
+                    device_id=device_id,
+                    api_key=api_key,
+                    topic=message.topic,
+                    payload=message.payload
+                )
+                
+                if not success:
+                    self.logger.warning("Authentication failed or telemetry storage failed for device %d", device_id)
+                    return
+            else:
+                self.logger.warning("No authentication service available for telemetry")
+                return
+            
+            # Parse payload for callbacks
             if isinstance(message.payload, (str, bytes)):
                 try:
                     payload_data = json.loads(message.payload)
@@ -137,10 +181,9 @@ class TelemetryMessageHandler(MQTTMessageHandler):
             else:
                 payload_data = message.payload
             
-            # Enrich with metadata
+            # Enrich with metadata for callbacks
             telemetry_data = {
                 "device_id": device_id,
-                "telemetry_type": subtopic,
                 "data": payload_data,
                 "timestamp": message.timestamp,
                 "topic": message.topic,
@@ -152,12 +195,12 @@ class TelemetryMessageHandler(MQTTMessageHandler):
                 try:
                     callback(telemetry_data)
                 except Exception as e:
-                    self.logger.error(f"Error in telemetry callback: {e}")
+                    self.logger.error("Error in telemetry callback: %s", str(e))
             
-            self.logger.debug(f"Processed telemetry from device {device_id}: {subtopic}")
+            self.logger.debug("Processed authenticated telemetry from device %d", device_id)
             
         except Exception as e:
-            self.logger.error(f"Error processing telemetry message: {e}")
+            self.logger.error("Error processing telemetry message: %s", str(e))
 
 
 class CommandMessageHandler(MQTTMessageHandler):
@@ -272,7 +315,7 @@ class MQTTClientService:
     Handles connections, subscriptions, and message routing
     """
     
-    def __init__(self, config: MQTTConfig):
+    def __init__(self, config: MQTTConfig, auth_service: MQTTAuthService = None):
         self.config = config
         self.client = None
         self.connected = False
@@ -282,14 +325,23 @@ class MQTTClientService:
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
         
+        # Initialize authentication service
+        self.auth_service = auth_service or MQTTAuthService()
+        
         # Initialize default message handlers
-        self.telemetry_handler = TelemetryMessageHandler()
+        self.telemetry_handler = TelemetryMessageHandler(self.auth_service)
         self.command_handler = CommandMessageHandler()
         self.status_handler = StatusMessageHandler()
+        
+        self.logger.info(f"Initializing MQTT client with telemetry handler: {self.telemetry_handler}")
+        self.logger.info(f"Telemetry handler topic pattern: {self.telemetry_handler.topic_pattern}")
+        self.logger.info(f"Auth service: {self.auth_service}")
         
         self.add_message_handler(self.telemetry_handler)
         self.add_message_handler(self.command_handler)
         self.add_message_handler(self.status_handler)
+        
+        self.logger.info(f"Added {len(self.message_handlers)} message handlers")
     
     def add_message_handler(self, handler: MQTTMessageHandler):
         """Add a message handler"""
@@ -362,7 +414,20 @@ class MQTTClientService:
             if result == mqtt.MQTT_ERR_SUCCESS:
                 # Start the network loop
                 self.client.loop_start()
-                return True
+                
+                # Wait for connection to be established (with timeout)
+                import time
+                timeout = 10  # 10 seconds timeout
+                start_time = time.time()
+                while not self.connected and (time.time() - start_time) < timeout:
+                    time.sleep(0.1)
+                
+                if self.connected:
+                    self.logger.info("MQTT connection established successfully")
+                    return True
+                else:
+                    self.logger.error("MQTT connection timeout")
+                    return False
             else:
                 self.logger.error(f"Failed to connect to MQTT broker: {mqtt.error_string(result)}")
                 return False
@@ -478,11 +543,13 @@ class MQTTClientService:
     def subscribe_to_system_topics(self) -> bool:
         """Subscribe to system-wide topics"""
         patterns = MQTTTopicManager.get_wildcard_patterns()
+        self.logger.info(f"Available wildcard patterns: {patterns}")
         success = True
         
         # Subscribe to key system topics
         system_topics = [
-            "all_device_telemetry",
+            "all_device_telemetry",      # Main telemetry topic (iotflow/devices/+/telemetry)
+            "all_device_telemetry_sub",  # Sub telemetry topics (iotflow/devices/+/telemetry/+)
             "all_device_status",
             "all_system_topics",
             "all_discovery"
@@ -490,8 +557,15 @@ class MQTTClientService:
         
         for topic_name in system_topics:
             if topic_name in patterns:
-                if not self.subscribe(patterns[topic_name]):
+                topic_pattern = patterns[topic_name]
+                self.logger.info(f"Subscribing to {topic_name}: {topic_pattern}")
+                if not self.subscribe(topic_pattern):
+                    self.logger.error(f"Failed to subscribe to {topic_name}: {topic_pattern}")
                     success = False
+                else:
+                    self.logger.info(f"Successfully subscribed to {topic_name}: {topic_pattern}")
+            else:
+                self.logger.warning(f"Topic pattern not found: {topic_name}")
         
         return success
     
@@ -502,7 +576,12 @@ class MQTTClientService:
             self.logger.info("Successfully connected to MQTT broker")
             
             # Subscribe to system topics
-            self.subscribe_to_system_topics()
+            self.logger.info("Attempting to subscribe to system topics...")
+            success = self.subscribe_to_system_topics()
+            if success:
+                self.logger.info("Successfully subscribed to all system topics")
+            else:
+                self.logger.warning("Failed to subscribe to some system topics")
             
         else:
             self.logger.error(f"Failed to connect to MQTT broker: {mqtt.connack_string(rc)}")
@@ -530,16 +609,23 @@ class MQTTClientService:
                 retain=msg.retain
             )
             
+            self.logger.info(f"MQTT message received on topic: {message.topic}, payload: {message.payload}")
+            
             # Route message to appropriate handlers
             handled = False
             for handler in self.message_handlers:
+                self.logger.info(f"Checking handler {handler.__class__.__name__} for topic {message.topic}")
                 if handler.can_handle(message.topic):
+                    self.logger.info(f"Handler {handler.__class__.__name__} can handle topic {message.topic}")
                     handler.handle_message(message)
                     handled = True
+                else:
+                    self.logger.info(f"Handler {handler.__class__.__name__} cannot handle topic {message.topic}")
             
             # Call topic-specific callbacks
             for topic_pattern, callbacks in self.subscription_callbacks.items():
                 if self._topic_matches_pattern(message.topic, topic_pattern):
+                    self.logger.info(f"Topic {message.topic} matches pattern {topic_pattern}, calling {len(callbacks)} callbacks")
                     for callback in callbacks:
                         try:
                             callback(message)
@@ -547,7 +633,7 @@ class MQTTClientService:
                             self.logger.error(f"Error in subscription callback: {e}")
             
             if not handled:
-                self.logger.debug(f"No handler for topic: {message.topic}")
+                self.logger.warning(f"No handler for topic: {message.topic}")
                 
         except Exception as e:
             self.logger.error(f"Error processing received message: {e}")
@@ -558,7 +644,7 @@ class MQTTClientService:
     
     def _on_subscribe(self, client, userdata, mid, granted_qos):
         """Callback for successful subscription"""
-        self.logger.debug(f"Subscription successful with mid: {mid}, QoS: {granted_qos}")
+        self.logger.info(f"Subscription successful with mid: {mid}, QoS: {granted_qos}")
     
     def _on_log(self, client, userdata, level, buf):
         """Callback for MQTT client logs"""
@@ -625,12 +711,13 @@ class MQTTClientService:
 
 
 # Factory function to create MQTT client service
-def create_mqtt_service(config: Dict[str, Any]) -> MQTTClientService:
+def create_mqtt_service(config: Dict[str, Any], auth_service: MQTTAuthService = None) -> MQTTClientService:
     """
     Factory function to create MQTT client service from configuration
     
     Args:
         config: Configuration dictionary
+        auth_service: Optional authentication service
         
     Returns:
         Configured MQTT client service
@@ -657,4 +744,4 @@ def create_mqtt_service(config: Dict[str, Any]) -> MQTTClientService:
         default_qos=config.get("default_qos", 1)
     )
     
-    return MQTTClientService(mqtt_config)
+    return MQTTClientService(mqtt_config, auth_service)
