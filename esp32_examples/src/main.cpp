@@ -12,6 +12,7 @@ and send simulated telemetry data using the correct topic structure and authenti
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
 #include <DHT.h>
+#include <Preferences.h>
 
 // DHT sensor configuration
 #define DHT_PIN 23      // DHT sensor connected to GPIO 4
@@ -28,7 +29,7 @@ const int mqtt_port = 1883;
 const int http_port = 5000;  // Flask server port
 
 // Device configuration
-String device_name = "esp32_012";  // Unique device name
+String device_name = "esp32_101";  // Unique device name
 String device_type = "esp32";
 String firmware_version = "1.0.0";
 String location = "lab";
@@ -41,6 +42,9 @@ bool device_registered = false;
 // MQTT client
 WiFiClient espClient;
 PubSubClient client(espClient);
+
+// Preferences for persistent storage
+Preferences preferences;
 
 // LED pin for remote control
 #define LED_PIN 2  // Built-in LED on GPIO 2
@@ -64,6 +68,8 @@ void send_device_status();
 String get_iso_timestamp();
 bool register_device_with_server();
 void send_extended_device_info();
+void load_device_credentials();
+void save_device_credentials();
 
 void setup() {
   Serial.begin(115200);
@@ -79,6 +85,9 @@ void setup() {
   // Initialize DHT sensor
   dht.begin();
   Serial.println("DHT sensor initialized");
+  
+  // Load stored device credentials
+  load_device_credentials();
   
   // Connect to WiFi
   setup_wifi();
@@ -471,18 +480,6 @@ bool register_device_with_server() {
     return true;
   }
   
-  // Hardcoded device info for known devices (bypass registration)
-  if (device_name == "esp32_012") {
-    Serial.println("📱 Using hardcoded device info for esp32_012");
-    device_id = 1;
-    device_api_key = "Dm5Lwagp7fJg6IeVbWhl9mzUn7ynBrHG";
-    device_registered = true;
-    Serial.println("✅ Device configured successfully!");
-    Serial.println("📋 Device ID: " + String(device_id));
-    Serial.println("🔑 API Key: " + device_api_key.substring(0, 8) + "...");
-    return true;
-  }
-  
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("❌ WiFi not connected, cannot register");
     return false;
@@ -547,9 +544,13 @@ bool register_device_with_server() {
         device_registered = true;
         success = true;
         
+        // Save credentials to persistent storage
+        save_device_credentials();
+        
         Serial.println("✅ Device registered successfully!");
         Serial.println("📋 Device ID: " + String(device_id));
         Serial.println("🔑 API Key: " + device_api_key.substring(0, 8) + "...");
+        Serial.println("💾 Credentials saved to persistent storage");
       } else {
         Serial.println("❌ Invalid response format - missing id or api_key");
       }
@@ -573,9 +574,13 @@ bool register_device_with_server() {
         device_registered = true;
         success = true;
         
+        // Save credentials to persistent storage
+        save_device_credentials();
+        
         Serial.println("✅ Using existing device registration!");
         Serial.println("📋 Device ID: " + String(device_id));
-        Serial.println("� API Key: " + device_api_key.substring(0, 8) + "...");
+        Serial.println("🔑 API Key: " + device_api_key.substring(0, 8) + "...");
+        Serial.println("💾 Credentials saved to persistent storage");
       } else {
         Serial.println("❌ Server response missing device info");
         Serial.println("💡 Change device_name in code or delete device from server database");
@@ -591,4 +596,42 @@ bool register_device_with_server() {
   
   http.end();
   return success;
+}
+
+void load_device_credentials() {
+  // Initialize preferences
+  preferences.begin("iotflow", false);  // false = read/write mode
+  
+  // Try to load stored credentials
+  if (preferences.isKey("device_id") && preferences.isKey("api_key")) {
+    device_id = preferences.getInt("device_id", -1);
+    device_api_key = preferences.getString("api_key", "");
+    
+    if (device_id != -1 && device_api_key.length() > 0) {
+      device_registered = true;
+      Serial.println("💾 Loaded stored device credentials:");
+      Serial.println("📋 Device ID: " + String(device_id));
+      Serial.println("🔑 API Key: " + device_api_key.substring(0, 8) + "...");
+    } else {
+      Serial.println("⚠️ Invalid stored credentials, will register new device");
+      device_registered = false;
+    }
+  } else {
+    Serial.println("📝 No stored credentials found, will register new device");
+    device_registered = false;
+  }
+  
+  preferences.end();
+}
+
+void save_device_credentials() {
+  // Save credentials to persistent storage
+  preferences.begin("iotflow", false);  // false = read/write mode
+  
+  preferences.putInt("device_id", device_id);
+  preferences.putString("api_key", device_api_key);
+  
+  preferences.end();
+  
+  Serial.println("💾 Device credentials saved to persistent storage");
 }
