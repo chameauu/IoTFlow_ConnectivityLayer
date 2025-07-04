@@ -122,10 +122,10 @@ class MQTTAuthService:
             
         try:
             with self.app.app_context():
-                # Validate device and authorization
-                device = self.validate_device_message(device_id, api_key, topic)
-                if not device:
-                    logger.warning("Unauthorized telemetry attempt from device_id %d", device_id)
+                # First, validate device registration
+                is_registered, reg_message = self.validate_device_registration(device_id, api_key)
+                if not is_registered:
+                    logger.warning(f"Device registration validation failed for device {device_id}: {reg_message}")
                     return False
                 
                 # Parse JSON payload
@@ -133,6 +133,18 @@ class MQTTAuthService:
                     data = json.loads(payload)
                 except json.JSONDecodeError:
                     logger.error("Invalid JSON payload from device %d: %s", device_id, payload)
+                    return False
+                
+                # Validate device and authorization using payload data
+                is_authorized, auth_message, device = self.is_device_registered_for_mqtt(data)
+                if not is_authorized:
+                    logger.warning(f"Device MQTT authorization failed for device {device_id}: {auth_message}")
+                    return False
+                
+                # Validate device and authorization
+                device = self.validate_device_message(device_id, api_key, topic)
+                if not device:
+                    logger.warning("Unauthorized telemetry attempt from device_id %d", device_id)
                     return False
                 
                 # Extract telemetry data and metadata
@@ -224,3 +236,61 @@ class MQTTAuthService:
             
         except Exception as e:
             logger.error(f"Error cleaning up inactive devices: {e}")
+    
+    def validate_device_registration(self, device_id: int, api_key: str) -> tuple[bool, str]:
+        """
+        Validate that device is properly registered before allowing MQTT communication
+        Returns (is_valid, message)
+        """
+        if not self.app:
+            return False, "No Flask app context available"
+        
+        try:
+            with self.app.app_context():
+                # Check if device exists and is active
+                device = Device.query.filter_by(id=device_id, api_key=api_key).first()
+                
+                if not device:
+                    logger.warning(f"Device registration validation failed: Device {device_id} not found with provided API key")
+                    return False, "Device not found or invalid API key"
+                
+                if device.status != 'active':
+                    logger.warning(f"Device registration validation failed: Device {device_id} is not active (status: {device.status})")
+                    return False, f"Device is not active (status: {device.status})"
+                
+                # Update last seen timestamp
+                device.update_last_seen()
+                
+                logger.info(f"Device registration validation successful for device {device_id}")
+                return True, "Device validated successfully"
+                
+        except Exception as e:
+            logger.error(f"Error validating device registration: {e}")
+            return False, f"Validation error: {str(e)}"
+    
+    def is_device_registered_for_mqtt(self, payload: dict) -> tuple[bool, str, Optional[Device]]:
+        """
+        Check if device is registered and authorized to send MQTT data
+        Returns (is_authorized, message, device)
+        """
+        try:
+            # Extract device info from payload
+            api_key = payload.get('api_key')
+            if not api_key:
+                return False, "Missing API key in message payload", None
+            
+            # Get device from database
+            device = self.authenticate_device_by_api_key(api_key)
+            if not device:
+                return False, "Invalid API key or device not found", None
+            
+            # Additional validation
+            is_valid, message = self.validate_device_registration(device.id, api_key)
+            if not is_valid:
+                return False, message, None
+            
+            return True, "Device authorized for MQTT communication", device
+            
+        except Exception as e:
+            logger.error(f"Error checking device MQTT authorization: {e}")
+            return False, f"Authorization check failed: {str(e)}", None

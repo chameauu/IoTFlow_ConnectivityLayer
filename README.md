@@ -1,28 +1,32 @@
 # IoTFlow - IoT Device Connectivity Layer
 
-A modern, scalable REST API built with Python Flask for comprehensive IoT device connectivity, telemetry data collection, and real-time analytics.
+A modern, production-ready IoT platform built with Python Flask for comprehensive device connectivity, telemetry data collection, and real-time analytics. Clean, modernized codebase with advanced MQTT device simulation and robust data storage.
 
 ## 🚀 Features
 
 ### Core Capabilities
-- **🔌 Device Management**: Register, authenticate, and manage IoT devices with se    └── docs/                           # Comprehensive docs
-    ├── MANAGEMENT_GUIDE.md         # Management & deployment guide
-    ├── HTTP_SIMULATION_TEST_RESULTS.md  # Testing results
-    └── iotdb_integration.md        # Architecture docs API keys
-- **./docker-manage.sh logs iotdb       # View specific service logs Hybrid Data Storage**: SQLite for device management + IoTDB for time-series telemetry
+- **🔌 Device Management**: Complete device lifecycle with secure API key authentication
+- **💾 Hybrid Data Storage**: SQLite for device metadata + IoTDB for time-series telemetry  
 - **📡 Multi-Protocol Support**: HTTP REST API + MQTT pub/sub messaging
-- **⚡ Real-time Analytics**: Time-series data queries, aggregations, and dashboards
-- **🛡️ Security First**: API key authentication, rate limiting, and secure endpoints
+- **⚡ Real-time Analytics**: Advanced time-series queries, aggregations, and dashboards
+- **🛡️ Enterprise Security**: API key authentication, rate limiting, and secure endpoints
 - **📈 Scalable Architecture**: Redis caching, background processing, containerized services
-- **🧪 Comprehensive Testing**: Built-in device simulators and testing framework
+- **🧪 Advanced Testing**: Production-ready device simulators and testing framework
 
-### Advanced Features
-- **🔍 Time-Series Queries**: Advanced IoTDB queries with filtering and aggregation
-- **🤖 Device Simulation**: Fleet simulators for development and testing
-- **📋 Admin Dashboard**: Complete device and data management interface
-- **📚 Poetry Integration**: Modern dependency management and development workflow
-- **🐳 Docker Compose**: Full containerized development environment
-- **📊 Monitoring**: Comprehensive logging, metrics, and health checks
+### Production Features
+- **🔍 Time-Series Analytics**: Complex IoTDB queries with filtering and aggregation
+- **🤖 Smart Device Simulation**: Advanced MQTT simulator with realistic device behavior
+- **📋 Admin Dashboard**: Complete device and telemetry management interface
+- **📚 Modern Development**: Poetry dependency management and development workflow
+- **🐳 Containerized Deployment**: Full Docker Compose development and production environment
+- **📊 Comprehensive Monitoring**: Structured logging, metrics, health checks, and debugging tools
+
+### Recent Improvements (v2.1.0)
+- **✨ Cleaned up simulator environment** - Removed all legacy simulators, single advanced simulator
+- **🔧 Enhanced device registration** - Smart handling of existing devices, auto-suffix options
+- **📈 Improved error handling** - Better debugging and diagnostic capabilities
+- **🔍 Enhanced data retrieval** - Comprehensive IoTDB data query and export tools
+- **📝 Production documentation** - Complete setup, testing, and troubleshooting guides
 
 ## 🏗️ Architecture
 
@@ -109,34 +113,95 @@ curl http://localhost:5000/health
 
 ## 🎮 Device Simulation & Testing
 
-### Single Device Test
-```bash
-# Basic sensor simulation (60s, telemetry every 15s)
-poetry run python simulators/basic_device_simulator.py --duration 60 --telemetry-interval 15
+### 🤖 Advanced MQTT Device Simulator (v2.1.0)
 
-# Specific device types
-poetry run python simulators/device_types.py --device-type temperature --duration 120
+The platform now includes a single, production-ready MQTT device simulator that replaces all legacy simulators. This advanced simulator provides realistic device behavior with multiple simulation profiles.
+
+#### Quick Start Examples
+
+```bash
+# Basic smart sensor (default profile, 5 minutes)
+poetry run python simulators/new_mqtt_device_simulator.py --name MyTestDevice
+
+# High-frequency sensor (data every 5 seconds)
+poetry run python simulators/new_mqtt_device_simulator.py \
+    --name HighFreqSensor \
+    --profile high_frequency \
+    --duration 600
+
+# Industrial sensor with comprehensive telemetry
+poetry run python simulators/new_mqtt_device_simulator.py \
+    --name IndustrialSensor001 \
+    --type industrial_sensor \
+    --profile industrial \
+    --duration 1800
+
+# Energy-efficient device (data every 5 minutes)
+poetry run python simulators/new_mqtt_device_simulator.py \
+    --name LowPowerSensor \
+    --profile energy_efficient \
+    --duration 3600
 ```
 
-### Fleet Simulation
+#### Advanced Options
+
 ```bash
-# Home setup (9 devices: sensors, locks, cameras)
-poetry run python simulators/fleet_simulator.py --preset home --duration 300
+# Handle existing device names automatically
+poetry run python simulators/new_mqtt_device_simulator.py \
+    --name ExistingDevice \
+    --auto-suffix            # Adds _1, _2, etc. if name exists
 
-# Office setup (16 devices)
-poetry run python simulators/fleet_simulator.py --preset office --duration 300
+# Force re-registration (use with caution)
+poetry run python simulators/new_mqtt_device_simulator.py \
+    --name ExistingDevice \
+    --force-register
 
-# Interactive simulation control
-poetry run python simulators/simulate.py --interactive
+# Custom connection settings
+poetry run python simulators/new_mqtt_device_simulator.py \
+    --name RemoteDevice \
+    --host remote-iot-server.com \
+    --mqtt-port 1883 \
+    --http-port 5000
 ```
 
-### Automated Testing
-```bash
-# Run all tests
-poetry run python manage.py test
+#### Simulation Profiles
 
-# Specific test suites
-poetry run pytest tests/ -v
+| Profile | Telemetry Interval | Data Types | Battery Drain | Use Case |
+|---------|-------------------|------------|---------------|----------|
+| `default` | 30 seconds | temperature, humidity, pressure, battery | 0.1%/hour | General IoT sensors |
+| `high_frequency` | 5 seconds | temperature, humidity, pressure, accelerometer, gyroscope | 0.5%/hour | Motion/vibration sensors |
+| `energy_efficient` | 5 minutes | temperature, battery | 0.05%/hour | Long-term deployment |
+| `industrial` | 10 seconds | temperature, pressure, vibration, power_consumption | 0.3%/hour | Industrial monitoring |
+
+#### Smart Registration Features
+
+- **Existing Device Detection**: Automatically checks if device name already exists
+- **Graceful Handling**: Provides clear guidance when device conflicts occur
+- **Auto-suffix Option**: Automatically appends numbers to device names (e.g., `MyDevice_1`)
+- **Force Registration**: Option to attempt re-registration of existing devices
+
+### 🧪 Testing & Validation
+
+#### End-to-End Testing
+```bash
+# Complete platform test
+./docker-manage.sh test
+
+# Test device registration and data flow
+poetry run python scripts/test_esp32_registration.py
+
+# Monitor device data in real-time
+poetry run python scripts/monitor_device_data.py --device TestDevice
+```
+
+#### Data Verification
+```bash
+# Check IoTDB data storage
+poetry run python scripts/retrieve_iotdb_data.py --list-devices
+poetry run python scripts/retrieve_iotdb_data.py --device 5 --latest --limit 20
+
+# Verify MQTT messaging
+./scripts/monitor_mqtt.sh
 ```
 ## 📡 API Endpoints
 
@@ -300,10 +365,9 @@ IoTFlow_ConnectivityLayer/
 │   └── utils/                       # Utility functions
 │       └── logging.py              # Logging configuration
 ├── 📁 simulators/                   # Device simulation & testing
-│   ├── basic_device_simulator.py   # Single device simulator
-│   ├── fleet_simulator.py          # Multi-device fleet simulator
-│   ├── device_types.py             # Specialized device simulators
-│   └── simulate.py                 # Interactive simulation control
+│   ├── new_mqtt_device_simulator.py # Advanced MQTT device simulator
+│   ├── NEW_MQTT_SIMULATOR.md       # Detailed simulator documentation
+│   └── README.md                   # Simulator usage guide
 ├── 📁 mqtt/                         # MQTT broker configuration
 │   └── config/                     # Mosquitto configuration files
 ├── 📁 tests/                        # Test suites (unit & integration)
@@ -373,17 +437,18 @@ poetry run pytest tests/api/ -v            # API endpoint tests
 #### Device Simulation Options
 
 ```bash
-# Interactive simulation (recommended for development)
-poetry run python simulators/simulate.py --interactive
+# Advanced MQTT device simulator with profiles
+poetry run python simulators/new_mqtt_device_simulator.py --name TestDevice
 
-# Single device tests
-poetry run python simulators/basic_device_simulator.py --duration 300
-poetry run python simulators/device_types.py --device-type temperature
+# Different device types and profiles
+poetry run python simulators/new_mqtt_device_simulator.py \
+    --name IndustrialSensor --type industrial_sensor --profile industrial --duration 600
 
-# Fleet simulations for load testing
-poetry run python simulators/fleet_simulator.py --preset home     # 9 devices
-poetry run python simulators/fleet_simulator.py --preset office   # 16 devices
-poetry run python simulators/fleet_simulator.py --preset factory  # 30 devices
+# Monitor device activity
+scripts/monitor_mqtt.sh -d TestDevice
+
+# Send commands to devices
+poetry run python scripts/send_device_command.py -d TestDevice -c get_status
 ```
 
 ### Configuration Management
@@ -514,25 +579,330 @@ curl http://localhost:5000/api/v1/admin/dashboard
 - **Redis**: Sub-millisecond caching responses
 - **Storage**: ~1KB per telemetry record
 
+## 🔧 Troubleshooting Guide
+
+### Common Issues and Solutions
+
+#### 🚨 HTTP 500 Error on Telemetry Submission
+
+**Symptoms:** `{"error":"Failed to store telemetry data","message":"IoTDB may not be available. Check logs for details."}`
+
+**Diagnosis:**
+```bash
+# Check IoTDB service status
+./docker-manage.sh status
+docker logs iotflow-iotdb
+
+# Test IoTDB connectivity
+poetry run python scripts/check_iotdb_data.py
+
+# Check Flask application logs
+tail -50 logs/iotflow.log
+```
+
+**Solutions:**
+1. **IoTDB Service Issues:**
+   ```bash
+   # Restart IoTDB service
+   docker restart iotflow-iotdb
+   
+   # Check IoTDB initialization
+   docker logs iotflow-iotdb | grep -i "error\|exception"
+   ```
+
+2. **Connection Issues:**
+   ```bash
+   # Verify IoTDB port accessibility
+   telnet localhost 6667
+   
+   # Check network configuration
+   docker network inspect iotflow_default
+   ```
+
+3. **Data Format Issues:**
+   ```bash
+   # Test with simple telemetry data
+   curl -X POST http://localhost:5000/api/v1/telemetry \
+     -H "X-API-Key: YOUR_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"data": {"temperature": 25.0}}'
+   ```
+
+#### 🔌 Device Registration Issues
+
+**Symptoms:** Device already exists errors, API key conflicts
+
+**Solutions:**
+```bash
+# Check existing devices
+curl http://localhost:5000/api/v1/admin/devices
+
+# Use auto-suffix for testing
+poetry run python simulators/new_mqtt_device_simulator.py \
+    --name TestDevice --auto-suffix
+
+# Force registration (development only)
+poetry run python simulators/new_mqtt_device_simulator.py \
+    --name TestDevice --force-register
+```
+
+#### 📡 MQTT Connection Problems
+
+**Symptoms:** MQTT connection failures, authentication errors
+
+**Diagnosis:**
+```bash
+# Check MQTT broker status
+docker logs iotflow-mqtt
+
+# Test MQTT connectivity
+mosquitto_pub -h localhost -p 1883 -t "test/topic" -m "test message"
+```
+
+**Solutions:**
+```bash
+# Restart MQTT broker
+docker restart iotflow-mqtt
+
+# Check authentication
+cat mqtt/config/passwd
+
+# Verify MQTT configuration
+cat mqtt/config/mosquitto.conf
+```
+
+#### 💾 Database Issues
+
+**Symptoms:** SQLite database corruption, IoTDB storage errors
+
+**Solutions:**
+```bash
+# Backup current database
+./docker-manage.sh backup
+
+# Reset database (CAUTION: destroys all data)
+./docker-manage.sh reset
+
+# Initialize fresh database
+poetry run python manage.py init-db
+```
+
+### Performance Issues
+
+#### Slow API Responses
+1. **Check resource usage:**
+   ```bash
+   docker stats
+   ```
+
+2. **Database optimization:**
+   ```bash
+   # SQLite maintenance
+   sqlite3 instance/iotflow.db "VACUUM;"
+   
+   # IoTDB compaction
+   # (handled automatically)
+   ```
+
+3. **Redis cache issues:**
+   ```bash
+   # Clear Redis cache
+   docker exec -it iotflow-redis redis-cli FLUSHALL
+   ```
+
+### Data Verification Tools
+
+#### Check Data Flow
+```bash
+# Comprehensive data flow test
+poetry run python scripts/check_device_data_flow.sh
+
+# Manual data verification
+poetry run python scripts/retrieve_iotdb_data.py --device 5 --latest --limit 10
+```
+
+#### Monitor Real-time Activity
+```bash
+# Watch device activity
+poetry run python scripts/monitor_device_data.py --device TestDevice
+
+# Monitor MQTT messages
+./scripts/monitor_mqtt.sh
+```
+
+## 📚 Advanced Features
+
+### 🔍 Data Analytics and Querying
+
+#### IoTDB Advanced Queries
+```bash
+# Complex time-series analytics
+poetry run python scripts/retrieve_iotdb_data.py \
+    --device 5 \
+    --hours 24 \
+    --measurements temperature humidity \
+    --export-csv device_5_analytics.csv
+
+# Aggregated data with custom intervals
+poetry run python scripts/retrieve_iotdb_data.py \
+    --device 5 \
+    --aggregate avg \
+    --interval 1h \
+    --hours 48
+```
+
+#### Data Export and Integration
+```bash
+# Export device data to multiple formats
+poetry run python scripts/retrieve_iotdb_data.py \
+    --device 5 --hours 6 --export-json device_data.json
+
+# Batch export all devices
+for device in $(curl -s http://localhost:5000/api/v1/admin/devices | jq -r '.[].id'); do
+    poetry run python scripts/retrieve_iotdb_data.py \
+        --device $device --hours 24 --export-csv "device_${device}_data.csv"
+done
+```
+
+### 🤖 Advanced Device Simulation
+
+#### Custom Device Profiles
+Create custom simulation profiles by modifying the simulator's profile configuration:
+
+```python
+# Example: Custom IoT gateway profile
+"iot_gateway": {
+    "telemetry_types": ["cpu_usage", "memory_usage", "network_traffic", "connected_devices"],
+    "telemetry_interval": 15,
+    "heartbeat_interval": 45,
+    "error_rate": 0.001,
+    "battery_drain_rate": 0.0  # Powered device
+}
+```
+
+#### Fleet Simulation
+```bash
+# Simulate multiple devices with different profiles
+for i in {1..5}; do
+    poetry run python simulators/new_mqtt_device_simulator.py \
+        --name "FleetDevice_$i" \
+        --profile $([ $((i % 2)) -eq 0 ] && echo "high_frequency" || echo "energy_efficient") \
+        --duration 1800 &
+done
+```
+
+### 🔐 Security and Authentication
+
+#### API Key Management
+```bash
+# Generate new API key for existing device
+poetry run python manage.py regenerate-api-key --device-id 5
+
+# List all active API keys (admin only)
+poetry run python manage.py list-api-keys
+```
+
+#### Advanced Rate Limiting
+Configure per-device and per-endpoint rate limiting in `src/middleware/auth.py`:
+- Device-specific limits
+- Time-window based limiting
+- Redis-backed rate limiting
+- Automatic scaling based on device tier
+
+### 📊 Monitoring and Alerting
+
+#### Custom Metrics
+```bash
+# Device-specific monitoring
+poetry run python scripts/monitor_device_data.py \
+    --device TestDevice \
+    --alert-threshold temperature:30 \
+    --alert-threshold battery:20
+```
+
+#### System Health Monitoring
+```bash
+# Comprehensive system health check
+poetry run python scripts/system_health_check.py
+
+# Service-specific health checks
+curl http://localhost:5000/health?include=iotdb,redis,mqtt
+```
+
+## 🔮 Future Roadmap
+
+### Planned Features
+- **🌐 Web Dashboard**: React-based admin interface
+- **📱 Mobile API**: RESTful API optimizations for mobile apps
+- **🔄 Device Firmware OTA**: Over-the-air firmware updates
+- **🧠 ML Analytics**: Machine learning for predictive maintenance
+- **☁️ Cloud Integration**: AWS IoT Core, Azure IoT Hub connectors
+- **📡 LoRaWAN Support**: Long-range, low-power device connectivity
+- **🔐 OAuth2**: Enterprise authentication integration
+
+### Architecture Evolution
+- **Microservices**: Service decomposition for scalability
+- **Message Queues**: Apache Kafka integration for high-throughput
+- **Time-series Database**: InfluxDB alternative support
+- **Edge Computing**: Edge device data processing capabilities
+
 ## 🤝 Contributing
 
-### Development Setup
+### Development Guidelines
 
+#### Code Style
 ```bash
-# Fork and clone repository
-git clone <your-fork-url>
-cd IoTFlow_ConnectivityLayer
-
 # Install development dependencies
 poetry install --with dev
 
 # Set up pre-commit hooks
 poetry run pre-commit install
 
-# Run development server
+# Run code formatting
+poetry run black .
+poetry run isort .
+
+# Run linting
+poetry run flake8 .
+poetry run mypy .
+```
+
+#### Testing Requirements
+- Unit tests for all new features
+- Integration tests for API endpoints
+- End-to-end tests for device simulation
+- Performance benchmarks for data operations
+
+#### Pull Request Process
+1. Fork the repository
+2. Create feature branch (`git checkout -b feature/AmazingFeature`)
+3. Write tests for new functionality
+4. Ensure all tests pass (`poetry run pytest`)
+5. Update documentation
+6. Submit pull request with detailed description
+
+### Development Environment
+
+```bash
+# Complete development setup
+git clone <repository-url>
+cd IoTFlow_ConnectivityLayer
+
+# Install dependencies
+poetry install --with dev
+
+# Set up environment
+cp .env.example .env
+
+# Start services
 ./docker-manage.sh start-all
 ./docker-manage.sh init-app
-./docker-manage.sh run
+
+# Run in development mode
+FLASK_ENV=development poetry run python app.py
+
+# Run tests continuously
+poetry run pytest --watch
 ```
 
 ### Code Quality
@@ -558,102 +928,208 @@ poetry run pytest tests/ --cov=src/
 - **[Testing Results](HTTP_SIMULATION_TEST_RESULTS.md)** - Performance and reliability tests
 - **[IoTDB Integration](docs/iotdb_integration.md)** - Time-series database setup
 
-## 📝 License
+## ❓ Frequently Asked Questions (FAQ)
+
+### General Questions
+
+**Q: What's the difference between the legacy simulators and the new advanced simulator?**
+A: The new advanced MQTT simulator (v2.1.0) replaces all legacy simulators with a single, production-ready tool that includes:
+- Multiple simulation profiles (default, high_frequency, energy_efficient, industrial)
+- Smart device registration handling (existing device detection, auto-suffix)
+- Realistic device behavior with battery simulation and network jitter
+- Comprehensive telemetry types and MQTT command handling
+- Better error handling and logging
+
+**Q: How do I handle the "device already exists" error during testing?**
+A: Use one of these approaches:
+```bash
+# Option 1: Auto-suffix (recommended for testing)
+--auto-suffix
+
+# Option 2: Use a different device name
+--name TestDevice_$(date +%s)
+
+# Option 3: Force registration (development only)
+--force-register
+```
+
+**Q: Why am I getting HTTP 500 errors when submitting telemetry?**
+A: This usually indicates IoTDB connection issues. Check:
+1. IoTDB service status: `docker logs iotflow-iotdb`
+2. Network connectivity: `telnet localhost 6667`
+3. Python IoTDB client: `poetry run python scripts/check_iotdb_data.py`
+
+**Q: How can I monitor device activity in real-time?**
+A: Use the monitoring tools:
+```bash
+# Monitor specific device
+poetry run python scripts/monitor_device_data.py --device TestDevice
+
+# Monitor MQTT messages
+./scripts/monitor_mqtt.sh
+
+# Check device logs
+tail -f logs/device_TestDevice.log
+```
+
+### Technical Questions
+
+**Q: What data types are supported for telemetry?**
+A: IoTDB supports:
+- **Numeric**: INT32, INT64, FLOAT, DOUBLE (for sensor readings)
+- **Text**: STRING (for status messages, JSON objects)
+- **Boolean**: BOOLEAN (for device states)
+- **Complex**: JSON objects (automatically converted to TEXT)
+
+**Q: How is data stored and organized?**
+A: 
+- **Device metadata**: SQLite database (`instance/iotflow.db`)
+- **Telemetry data**: IoTDB time-series database (`root.iotflow.devices.device_{id}`)
+- **Session data**: Redis cache for rate limiting and authentication
+- **MQTT messages**: Real-time pub/sub (not persisted)
+
+**Q: Can I use this in production?**
+A: Yes, with proper configuration:
+- Use production database settings (PostgreSQL instead of SQLite)
+- Enable TLS for MQTT and HTTP
+- Set up proper monitoring and alerting
+- Configure rate limiting and security headers
+- Use load balancing for Flask application
+
+**Q: How do I scale the platform for more devices?**
+A: Scaling strategies:
+1. **Horizontal scaling**: Multiple Flask instances behind load balancer
+2. **Database scaling**: PostgreSQL with read replicas
+3. **IoTDB clustering**: Distributed IoTDB setup
+4. **Message queuing**: Add Apache Kafka for high-throughput scenarios
+5. **Microservices**: Split into device management, telemetry, and analytics services
+
+### Development Questions
+
+**Q: How do I add a new device type?**
+A: 
+1. Add device type to the allowed types in `src/routes/devices.py`
+2. Update device simulator profiles if needed
+3. Consider any specific telemetry requirements
+4. Update documentation and tests
+
+**Q: How do I add custom telemetry fields?**
+A: Telemetry fields are flexible:
+```python
+# In device simulator or API call
+"data": {
+    "temperature": 25.0,
+    "custom_field": "any_value",
+    "complex_data": {"nested": "object"}
+}
+```
+IoTDB will automatically create time series for new fields.
+
+**Q: How do I backup and restore data?**
+A: 
+```bash
+# Backup SQLite database
+./docker-manage.sh backup
+
+# Backup IoTDB data
+docker exec iotflow-iotdb iotdb-export.sh -h localhost -p 6667 -u root -pw root -t /tmp/backup
+
+# Restore database
+./docker-manage.sh restore backup_file.db
+```
+
+## 📋 Quick Reference
+
+### Essential Commands
+```bash
+# Complete setup
+./docker-manage.sh start-all && ./docker-manage.sh init-app && ./docker-manage.sh run
+
+# Test device simulation
+poetry run python simulators/new_mqtt_device_simulator.py --name QuickTest --duration 60
+
+# Check system health
+curl http://localhost:5000/health
+
+# View logs
+./docker-manage.sh logs
+
+# Reset everything (CAUTION)
+./docker-manage.sh reset
+```
+
+### API Endpoints Summary
+| Purpose | Method | Endpoint | Authentication |
+|---------|--------|----------|----------------|
+| Register device | POST | `/api/v1/devices/register` | None |
+| Submit telemetry | POST | `/api/v1/telemetry` | API Key |
+| Get device data | GET | `/api/v1/telemetry/{device_id}` | None |
+| List devices | GET | `/api/v1/admin/devices` | Admin |
+| Health check | GET | `/health` | None |
+
+### Common Data Formats
+```bash
+# Device registration
+{
+  "name": "MyDevice",
+  "device_type": "smart_sensor",
+  "location": "Office",
+  "description": "Temperature and humidity sensor"
+}
+
+# Telemetry submission
+{
+  "data": {
+    "temperature": 23.5,
+    "humidity": 65.2,
+    "battery_level": 87
+  },
+  "metadata": {
+    "location": "Office",
+    "sensor_status": "active"
+  },
+  "timestamp": "2025-07-04T10:30:00Z"
+}
+```
+
+## 📞 Support and Community
+
+### Getting Help
+- **GitHub Issues**: Bug reports and feature requests
+- **Documentation**: Comprehensive docs in `/docs` directory
+- **Examples**: Working examples in `/simulators` and `/scripts`
+- **Logs**: Detailed logging for troubleshooting
+
+### Reporting Issues
+When reporting issues, please include:
+1. **Environment details**: OS, Python version, Docker version
+2. **Steps to reproduce**: Exact commands and configuration
+3. **Error messages**: Complete error output and logs
+4. **Expected behavior**: What should have happened
+5. **Actual behavior**: What actually happened
+
+### Feature Requests
+- Use GitHub issues with the "enhancement" label
+- Provide detailed use case and requirements
+- Include examples of expected API behavior
+- Consider backward compatibility implications
+
+---
+
+## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🆘 Support
+## 🙏 Acknowledgments
 
-### Getting Help
-- **Documentation**: Check the comprehensive guides in `/docs`
-- **Issues**: Open GitHub issues for bugs and feature requests
-- **Discussions**: Use GitHub Discussions for general questions
+- **IoTDB Community** for the excellent time-series database
+- **Flask Community** for the robust web framework
+- **Docker Community** for containerization best practices
+- **MQTT.org** for the messaging protocol specifications
+- **Contributors** who have helped improve this platform
 
-### Troubleshooting
+---
 
-**Common Issues:**
-- **Service Connection**: Check `./docker-manage.sh status`
-- **Database Issues**: Run `./docker-manage.sh reset` and reinitialize
-- **Port Conflicts**: Check that ports 5000, 6379, 6667, 1883 are available
-- **Poetry Issues**: Update with `poetry install --sync`
+**IoTFlow v2.1.0** - A modern, production-ready IoT connectivity platform.
 
-**Log Locations:**
-- Application: `logs/iotflow.log`
-- Docker services: `docker-compose logs [service]`
-- System: Check with `./docker-manage.sh logs`
-
-### Docker Deployment
-
-```dockerfile
-FROM python:3.9-slim
-
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-COPY . .
-EXPOSE 5000
-
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "app:app"]
-```
-
-### Environment Setup for Production
-
-1. **Database**: For production, consider using PostgreSQL or MySQL with connection pooling
-2. **Security**: Change all default passwords and secret keys
-3. **Logging**: Configure centralized logging
-4. **Monitoring**: Set up application monitoring
-5. **SSL**: Enable HTTPS with proper certificates
-6. **Rate Limiting**: Use Redis for distributed rate limiting
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Database Connection Failed**
-
-   - Check database file permissions and disk space
-   - Verify credentials in `.env`
-   - Ensure database exists
-
-2. **API Key Authentication Failed**
-
-   - Verify API key in `X-API-Key` header
-   - Check device is active
-   - Ensure API key hasn't expired
-
-3. **Telemetry Submission Failed**
-   - Validate JSON payload structure
-   - Check rate limiting
-   - Verify device authentication
-
-### Debug Mode
-
-Enable debug mode for development:
-
-```bash
-export FLASK_ENV=development
-export DEBUG=True
-python app.py
-```
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Support
-
-For issues and questions:
-
-1. Check the troubleshooting section
-2. Review the logs in `logs/iotflow.log`
-3. Run the test script: `python test_api.py`
-4. Verify database connectivity
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+Built with ❤️ for the IoT community.

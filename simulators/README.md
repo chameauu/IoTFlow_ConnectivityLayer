@@ -1,52 +1,60 @@
-# IoT Device Simulator - Quick Start Guide
+# IoT Device Simulators - Production Ready
 
-## 🚀 **Phase 1 Complete: Simple Device Simulator**
+## 🚀 **Advanced MQTT Device Simulator**
 
-Your IoT device simulators are ready! Here's how to use them:
+A comprehensive, production-ready MQTT device simulator with advanced features for the IoTFlow platform.
 
-## **Quick Start Options**
+## **Quick Start**
 
-### **Option 1: Interactive Mode (Recommended)**
-
-```bash
-cd simulators
-poetry run python simulate.py --interactive
-```
-
-### **Option 2: Single Device Test**
+### **Basic Usage**
 
 ```bash
-# Basic sensor device
-poetry run python simulators/basic_device_simulator.py --duration 120 --telemetry-interval 20
+# Run with default settings
+poetry run python new_mqtt_device_simulator.py --name MyTestDevice
 
-# Specific device types
-poetry run python simulators/device_types.py --device-type temperature --duration 120
-poetry run python simulators/device_types.py --device-type door_lock --duration 120
-poetry run python simulators/device_types.py --device-type camera --duration 120
+# Run for specific duration
+poetry run python new_mqtt_device_simulator.py --name MyDevice --duration 600
 ```
 
-### **Option 3: Fleet Simulation**
+### **Simulation Profiles**
+
+Choose from 4 pre-configured profiles:
 
 ```bash
-# Home setup (9 devices)
-poetry run python simulators/fleet_simulator.py --preset home --duration 300
+# Default profile (standard sensor)
+poetry run python new_mqtt_device_simulator.py --name StandardSensor --profile default
 
-# Office setup (16 devices)
-poetry run python simulators/fleet_simulator.py --preset office --duration 300
+# High-frequency motion sensor
+poetry run python new_mqtt_device_simulator.py \
+    --name MotionSensor001 \
+    --type motion_sensor \
+    --profile high_frequency \
+    --duration 1800
 
-# Custom fleet
-poetry run python simulators/fleet_simulator.py --preset custom --temperature-sensors 3 --cameras 2
+# Energy-efficient environmental sensor
+poetry run python new_mqtt_device_simulator.py \
+    --name EnvSensor001 \
+    --type environmental_sensor \
+    --profile energy_efficient \
+    --duration 3600
+
+# Industrial sensor with vibration monitoring
+poetry run python new_mqtt_device_simulator.py \
+    --name IndustrialSensor001 \
+    --type industrial_sensor \
+    --profile industrial \
+    --duration 1800
 ```
 
-## **Device Types Available**
+## **Advanced Features**
 
-### **1. Basic Sensor Device**
+### **1. Comprehensive Device Types**
 
-- **Data**: Temperature, humidity, pressure, battery, signal
-- **Pattern**: Daily temperature cycles (18-35°C)
-- **Features**: Network failure simulation, battery drain
-
-### **2. Temperature Sensor**
+- **smart_sensor** - Standard IoT sensor (default)
+- **industrial_sensor** - Industrial monitoring device
+- **environmental_sensor** - Environmental monitoring
+- **motion_sensor** - Motion and acceleration detection
+- **energy_meter** - Power consumption monitoring
 
 - **Data**: Temperature, humidity, location status
 - **Pattern**: Indoor vs outdoor temperature patterns
@@ -150,25 +158,42 @@ poetry run python simulators/fleet_simulator.py --preset custom --temperature-se
 
 ### **Quick Device Tests**
 
+## **Testing Examples**
+
+### **Quick Tests**
+
 ```bash
-# 3-minute temperature sensor test
-python3 device_types.py --device-type temperature --duration 180 --interval 20
+# 2-minute default sensor test
+poetry run python new_mqtt_device_simulator.py --name QuickTest --duration 120
 
-# 5-minute home fleet simulation
-python3 fleet_simulator.py --preset home --duration 300 --telemetry-interval 30
+# High-frequency motion sensor test
+poetry run python new_mqtt_device_simulator.py \
+    --name MotionTest \
+    --type motion_sensor \
+    --profile high_frequency \
+    --duration 180
 
-# Custom device with specific name
-python3 basic_device_simulator.py --name "MyTestDevice" --duration 120
+# Energy-efficient long-running test
+poetry run python new_mqtt_device_simulator.py \
+    --name LongRunTest \
+    --profile energy_efficient \
+    --duration 3600
 ```
 
 ### **Load Testing**
 
 ```bash
-# Factory simulation for 10 minutes (30 devices)
-python3 fleet_simulator.py --preset factory --duration 600 --telemetry-interval 30
+# Multiple devices (run in separate terminals)
+poetry run python new_mqtt_device_simulator.py --name Device001 --duration 600 &
+poetry run python new_mqtt_device_simulator.py --name Device002 --duration 600 &
+poetry run python new_mqtt_device_simulator.py --name Device003 --duration 600 &
 
-# High-frequency data collection
-python3 basic_device_simulator.py --telemetry-interval 10 --duration 300
+# High-frequency industrial sensors
+poetry run python new_mqtt_device_simulator.py \
+    --name IndustrialSensor001 \
+    --type industrial_sensor \
+    --profile industrial \
+    --duration 1800
 ```
 
 ## **Monitoring Your Simulations**
@@ -185,56 +210,137 @@ curl -s "http://localhost:5000/api/v1/admin/devices" | python3 -m json.tool
 curl -s "http://localhost:5000/health?detailed=true" | python3 -m json.tool
 ```
 
-### **3. Monitor Telemetry Data**
+### **3. Monitor MQTT Activity**
 
 ```bash
-curl -s "http://localhost:5000/api/v1/admin/telemetry?limit=10" | python3 -m json.tool
+# Monitor specific device
+../scripts/monitor_mqtt.sh -d MyTestDevice
+
+# Monitor all devices
+../scripts/monitor_mqtt.sh -a
+
+# Send commands
+poetry run python ../scripts/send_device_command.py -d MyTestDevice -c get_status
 ```
 
-### **4. Dashboard Statistics**
+### **2. Simulation Profiles**
+
+- **Default**: temperature, humidity, pressure, battery (30s/60s intervals)
+- **High Frequency**: includes accelerometer/gyroscope (5s/30s intervals)
+- **Energy Efficient**: minimal telemetry for battery preservation (5min/10min intervals)
+- **Industrial**: vibration and power monitoring (10s/30s intervals)
+
+### **3. Realistic Telemetry Generation**
+
+- **Temperature**: Daily cycles with realistic variations
+- **Humidity**: Correlated with temperature
+- **Battery**: Gradual drain based on profile
+- **Motion**: Accelerometer and gyroscope data
+- **Industrial**: Vibration and power consumption
+
+### **4. Command & Control**
+
+Remote command support via MQTT:
 
 ```bash
-curl -s "http://localhost:5000/api/v1/admin/dashboard" | python3 -m json.tool
+# Send commands using the utility script
+poetry run python ../scripts/send_device_command.py -d MyDevice -c restart
+poetry run python ../scripts/send_device_command.py -d MyDevice -c get_status
+poetry run python ../scripts/send_device_command.py -d MyDevice -c update_interval --interval 10
 ```
 
-## **Real-Time Monitoring**
+## **Monitoring & Testing**
 
-While simulations are running, you can monitor:
+### **Monitor MQTT Topics**
 
-- **Device count**: Total registered devices
-- **Online devices**: Currently active devices
-- **Telemetry rate**: Data points per minute
-- **System health**: Database and Redis status
-- **Rate limiting**: API request patterns
+```bash
+# Monitor all topics for a device
+../scripts/monitor_mqtt.sh -d MyTestDevice
 
-## **Next Steps**
+# Monitor all device activity
+../scripts/monitor_mqtt.sh -a
 
-Your **Phase 1** implementation is complete! Ready for:
+# Using mosquitto_sub directly
+mosquitto_sub -h localhost -p 1883 -t "devices/MyTestDevice/+" -v
+```
 
-- **Phase 2**: Advanced Device Behaviors & Fleet Management
-- **Phase 3**: Hardware Integration (Raspberry Pi, Arduino)
-- **Phase 4**: Real-time Dashboard & Analytics
+### **MQTT Topics Structure**
+
+- `devices/{name}/telemetry` - Sensor data
+- `devices/{name}/heartbeat` - Device health status
+- `devices/{name}/status` - Status updates and command responses
+- `devices/{name}/commands` - Remote commands (subscribe)
+- `devices/{name}/config` - Configuration updates (subscribe)
+- `devices/{name}/errors` - Error reports
+
+## **Integration with IoTFlow**
+
+### **1. HTTP Device Registration**
+- Automatically registers with `/api/v1/devices/register`
+- Receives device ID and API key for authentication
+
+### **2. MQTT Authentication**
+- Uses device ID and API key for secure MQTT connection
+- Follows IoTFlow's authentication protocol
+
+### **3. Data Flow**
+- Telemetry → MQTT → IoTFlow → IoTDB
+- Heartbeat and status monitoring
+- Command handling and responses
+
+## **Example Output**
+
+```
+2025-07-04 10:30:15,123 - INFO - [NewMQTT-MyTestDevice] - 🔧 Loaded simulation profile: default
+2025-07-04 10:30:15,124 - INFO - [NewMQTT-MyTestDevice] - 🔗 Registering device: MyTestDevice
+2025-07-04 10:30:15,456 - INFO - [NewMQTT-MyTestDevice] - ✅ Device registered successfully!
+2025-07-04 10:30:15,457 - INFO - [NewMQTT-MyTestDevice] - 🔌 Connected to MQTT broker at localhost:1883
+2025-07-04 10:30:15,678 - INFO - [NewMQTT-MyTestDevice] - 💓 Heartbeat sent - Uptime: 1s
+2025-07-04 10:30:45,789 - INFO - [NewMQTT-MyTestDevice] - 📊 Telemetry sent - Temp: 24.5°C, Battery: 99.9%
+```
+
+## **Requirements**
+
+- IoTFlow service running (`poetry run python app.py`)
+- MQTT broker active (included in docker-compose)
+- Python packages: `paho-mqtt`, `requests` (included in pyproject.toml)
 
 ## **Troubleshooting**
 
-### **"Cannot connect to service"**
+### **"Cannot connect to IoTFlow service"**
 
 1. Start Docker services: `./docker-manage.sh start`
 2. Start Flask app: `poetry run python app.py`
 3. Check health: `curl http://localhost:5000/health`
 
-### **"Registration failed"**
+### **"Device name already exists"**
 
-- Check if device name already exists
-- Verify service is running
-- Check network connectivity
+- Use a different device name
+- Each device name must be unique in the system
 
-### **"Rate limit exceeded"**
+### **"MQTT connection failed"**
 
-- This is normal and expected!
-- Rate limiting is working correctly
-- Devices will automatically retry
+- Ensure device registration was successful
+- Check MQTT broker is running (docker-compose)
+- Verify network connectivity
+
+### **"Command not working"**
+
+- Ensure device is running and connected
+- Check MQTT topic names are correct
+- Monitor with `mosquitto_sub` to verify message flow
+
+## **File Structure**
+
+```
+simulators/
+├── new_mqtt_device_simulator.py    # Main advanced simulator
+├── NEW_MQTT_SIMULATOR.md          # Detailed documentation
+└── README.md                      # This file
+```
 
 ---
 
-**🎉 Phase 1 Complete! Your IoT device simulators are ready to test your connectivity layer.**
+**🎉 Production-Ready MQTT Device Simulator!**
+
+For detailed documentation, see [`NEW_MQTT_SIMULATOR.md`](NEW_MQTT_SIMULATOR.md)
