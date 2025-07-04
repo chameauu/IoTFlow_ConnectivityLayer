@@ -1,37 +1,33 @@
-# IoTFlow - Advanced IoT Device Connectivity Layer
+# IoTFlow - IoT Device Connectivity Layer
 
-A comprehensive, production-ready REST API built with Python Flask for scalable IoT device connectivity, real-time telemetry data collection, and advanced analytics with Apache IoTDB time-series database.
+A modern, scalable REST API built with Python Flask for comprehensive IoT device connectivity, telemetry data collection, and real-time analytics.
 
-## 🚀 Key Features
+## 🚀 Features
 
-### 🏗️ **Enterprise Architecture**
-- **🔌 Advanced Device Management**: Full lifecycle device registration, authentication, and configuration
-- **📊 Time-Series Excellence**: Apache IoTDB for high-performance telemetry storage and querying
-- **📡 Multi-Protocol Support**: HTTP REST API + MQTT pub/sub + WebSocket real-time communication
-- **⚡ Real-time Analytics**: Advanced time-series queries, aggregations, and live dashboards
-- **🛡️ Enterprise Security**: Multi-layer API key authentication, rate limiting, and secure endpoints
-- **📈 Production-Ready**: Redis caching, background processing, containerized microservices
-- **🧪 Comprehensive Testing**: Advanced device simulators and automated testing framework
+### Core Capabilities
+- **🔌 Device Management**: Register, authenticate, and manage IoT devices with se    └── docs/                           # Comprehensive docs
+    ├── MANAGEMENT_GUIDE.md         # Management & deployment guide
+    ├── HTTP_SIMULATION_TEST_RESULTS.md  # Testing results
+    └── iotdb_integration.md        # Architecture docs API keys
+- **./docker-manage.sh logs iotdb       # View specific service logs Hybrid Data Storage**: SQLite for device management + IoTDB for time-series telemetry
+- **📡 Multi-Protocol Support**: HTTP REST API + MQTT pub/sub messaging
+- **⚡ Real-time Analytics**: Time-series data queries, aggregations, and dashboards
+- **🛡️ Security First**: API key authentication, rate limiting, and secure endpoints
+- **📈 Scalable Architecture**: Redis caching, background processing, containerized services
+- **🧪 Comprehensive Testing**: Built-in device simulators and testing framework
 
-### 🔥 **Advanced Capabilities**
-- **🔍 Advanced Time-Series Queries**: Complex IoTDB queries with filtering, aggregation, and windowing
-- **🤖 Intelligent Device Simulation**: Multi-device fleet simulators with realistic behavioral patterns
-- **📋 Real-time Admin Dashboard**: Complete device and data management with live metrics
-- **📚 Modern Development Stack**: Poetry dependency management, Docker orchestration
-- **🐳 Cloud-Native Deployment**: Full containerized environment with health monitoring
-- **📊 Production Monitoring**: Comprehensive logging, metrics, alerting, and observability
+### Advanced Features
+- **🔍 Time-Series Queries**: Advanced IoTDB queries with filtering and aggregation
+- **🤖 Device Simulation**: Fleet simulators for development and testing
+- **📋 Admin Dashboard**: Complete device and data management interface
+- **📚 Poetry Integration**: Modern dependency management and development workflow
+- **🐳 Docker Compose**: Full containerized development environment
+- **📊 Monitoring**: Comprehensive logging, metrics, and health checks
 
-### 🎯 **IoTDB Integration Benefits**
-- **🚀 Superior Performance**: Native time-series optimization for IoT workloads
-- **💾 Efficient Storage**: Hierarchical data model with advanced compression
-- **🔍 Powerful Queries**: SQL-like syntax with time-series specific functions
-- **⚖️ Horizontal Scaling**: Built-in clustering and distributed architecture support
-- **🛠️ Easy Management**: Simplified configuration and maintenance compared to InfluxDB
-
-## 🏗️ System Architecture
+## 🏗️ Architecture
 
 ```
-    📱 IoT Devices (HTTP/MQTT/WebSocket)
+    IoT Devices (HTTP/MQTT)
            ↓
     ┌─────────────────────────┐
     │   Load Balancer/Proxy   │
@@ -43,9 +39,8 @@ A comprehensive, production-ready REST API built with Python Flask for scalable 
     └─────────┬─────────┬─────┘
               ↓         ↓
     ┌─────────────┐   ┌──────────────┐
-    │   SQLite    │   │  Apache      │
-    │ (Devices)   │   │  IoTDB       │
-    │             │   │ (Telemetry)  │
+    │   SQLite    │   │    IoTDB     │
+    │ (Devices)   │   │ (Telemetry)  │
     └─────────────┘   └──────────────┘
               ↓
     ┌─────────────────────────┐
@@ -74,6 +69,9 @@ curl -sSL https://install.python-poetry.org | python3 -
 
 # Install dependencies with Poetry
 poetry install
+
+# Or with pip
+pip install -r requirements.txt
 ```
 
 ### 2. Environment Configuration
@@ -109,124 +107,38 @@ curl http://localhost:5000/health
 ./docker-manage.sh test
 ```
 
-## 🎮 Advanced Device Simulation & Testing
+## 🎮 Device Simulation & Testing
 
-### 🚀 **Interactive Simulation Hub**
-
-Start the interactive simulation control center:
-
+### Single Device Test
 ```bash
-cd simulators
-poetry run python simulate.py --interactive
-```
+# Basic sensor simulation (60s, telemetry every 15s)
+poetry run python simulators/basic_device_simulator.py --duration 60 --telemetry-interval 15
 
-### 🤖 **Single Device Simulators**
-
-#### Basic Sensor Simulation
-```bash
-# Standard sensor device (temperature, humidity, pressure)
-poetry run python simulators/basic_device_simulator.py --duration 120 --telemetry-interval 15
-
-# Custom device with specific name
-poetry run python simulators/basic_device_simulator.py --name "MyTestSensor" --duration 300
-```
-
-#### Specialized Device Types
-```bash
-# Temperature sensor with location-based patterns
+# Specific device types
 poetry run python simulators/device_types.py --device-type temperature --duration 120
-
-# Smart door lock with activity patterns
-poetry run python simulators/device_types.py --device-type door_lock --duration 120
-
-# Security camera with motion detection
-poetry run python simulators/device_types.py --device-type camera --duration 120
-
-# Air quality monitor with pollutant simulation
-poetry run python simulators/device_types.py --device-type air_quality --duration 120
-
-# Smart thermostat with scheduling
-poetry run python simulators/device_types.py --device-type thermostat --duration 120
 ```
 
-### 🏢 **Fleet Simulation Scenarios**
-
-#### Home Environment (9 devices)
+### Fleet Simulation
 ```bash
+# Home setup (9 devices: sensors, locks, cameras)
 poetry run python simulators/fleet_simulator.py --preset home --duration 300
-```
-- 3x Temperature sensors (indoor/outdoor/basement)
-- 2x Smart door locks (front/back door)
-- 2x Security cameras (yard/driveway)
-- 1x Air quality monitor (living room)
-- 1x Smart thermostat (main zone)
 
-#### Office Environment (16 devices)
-```bash
+# Office setup (16 devices)
 poetry run python simulators/fleet_simulator.py --preset office --duration 300
-```
-- 5x Temperature sensors (conference rooms, offices)
-- 3x Smart door locks (main entrance, server room, executive)
-- 4x Security cameras (lobby, parking, hallways)
-- 2x Air quality monitors (open floor, server room)
-- 2x Smart thermostats (zone control)
 
-#### Industrial Environment (30 devices)
+# Interactive simulation control
+poetry run python simulators/simulate.py --interactive
+```
+
+### Automated Testing
 ```bash
-poetry run python simulators/fleet_simulator.py --preset factory --duration 300
+# Run all tests
+poetry run python manage.py test
+
+# Specific test suites
+poetry run pytest tests/ -v
 ```
-- 10x Temperature sensors (production zones)
-- 5x Smart door locks (security checkpoints)
-- 8x Security cameras (comprehensive coverage)
-- 4x Air quality monitors (environmental compliance)
-- 3x Smart thermostats (large area control)
-
-#### Custom Fleet Configuration
-```bash
-# Create your own device mix
-poetry run python simulators/fleet_simulator.py --preset custom \
-  --temperature-sensors 5 \
-  --cameras 3 \
-  --door-locks 2 \
-  --air-quality 1 \
-  --thermostats 1 \
-  --duration 600
-```
-
-### 🎯 **MQTT Device Simulators**
-
-#### MQTT-Only Device Simulation
-```bash
-# Pure MQTT device (no REST API registration)
-poetry run python simulators/mqtt_device_simulator.py --device-id 999 --duration 300
-
-# MQTT fleet simulation
-poetry run python simulators/mqtt_fleet_simulator.py --device-count 10 --duration 300
-```
-
-### 📊 **Load Testing & Performance**
-
-#### High-Frequency Data Collection
-```bash
-# Rapid telemetry submission (every 10 seconds)
-poetry run python simulators/basic_device_simulator.py --telemetry-interval 10 --duration 300
-
-# Factory simulation with high load (30 devices, 30-second intervals)
-poetry run python simulators/fleet_simulator.py --preset factory --duration 600 --telemetry-interval 30
-```
-
-#### Stress Testing
-```bash
-# Maximum device count simulation
-poetry run python simulators/fleet_simulator.py --preset custom \
-  --temperature-sensors 20 \
-  --cameras 10 \
-  --door-locks 10 \
-  --duration 1200 \
-  --telemetry-interval 20
-```
-
-## 📡 Comprehensive API Endpoints
+## 📡 API Endpoints
 
 ### 🔌 Device Management
 
@@ -236,9 +148,8 @@ poetry run python simulators/fleet_simulator.py --preset custom \
 | GET    | `/api/v1/devices/status`   | Get device status & health     | API Key       |
 | POST   | `/api/v1/devices/heartbeat`| Send device heartbeat          | API Key       |
 | PUT    | `/api/v1/devices/config`   | Update device configuration    | API Key       |
-| DELETE | `/api/v1/devices/unregister` | Unregister device            | API Key       |
 
-### 📊 Telemetry & Time-Series Data
+### 📊 Telemetry & Data
 
 | Method | Endpoint                           | Description                    | Auth Required |
 |--------|------------------------------------|--------------------------------|---------------|
@@ -246,10 +157,9 @@ poetry run python simulators/fleet_simulator.py --preset custom \
 | GET    | `/api/v1/telemetry/{device_id}`   | Get device telemetry history   | None          |
 | GET    | `/api/v1/telemetry/{device_id}/latest` | Get latest telemetry      | None          |
 | GET    | `/api/v1/telemetry/{device_id}/aggregated` | Get aggregated data   | None          |
-| GET    | `/api/v1/telemetry/{device_id}/range` | Get time-range data     | None          |
 | DELETE | `/api/v1/telemetry/{device_id}`   | Delete device telemetry        | Admin         |
 
-### 🛠️ Administration & Management
+### 🛠️ Administration
 
 | Method | Endpoint                      | Description                 | Auth Required |
 |--------|-------------------------------|-----------------------------|--------------| 
@@ -258,23 +168,19 @@ poetry run python simulators/fleet_simulator.py --preset custom \
 | PUT    | `/api/v1/admin/devices/{id}`  | Update device               | Admin         |
 | DELETE | `/api/v1/admin/devices/{id}`  | Delete device               | Admin         |
 | GET    | `/api/v1/admin/dashboard`     | Get dashboard statistics    | Admin         |
-| GET    | `/api/v1/admin/analytics`     | Get advanced analytics      | Admin         |
 
-### 🔍 System Health & Monitoring
+### 🔍 System Health
 
 | Method | Endpoint              | Description              |
 |--------|-----------------------|--------------------------|
-| GET    | `/health`             | Basic API health check         |
-| GET    | `/health?detailed=true` | Comprehensive system status |
-| GET    | `/api/v1/telemetry/status` | IoTDB and telemetry system status |
-| GET    | `/metrics`            | Prometheus-compatible metrics |
+| GET    | `/health`             | API health check         |
+| GET    | `/api/v1/telemetry/status` | Telemetry system status |
 
-## 💡 Advanced Usage Examples
+## 💡 Usage Examples
 
-### Register and Configure a Device
+### Register a Device
 
 ```bash
-# Register a new temperature sensor
 curl -X POST http://localhost:5000/api/v1/devices/register \
   -H "Content-Type: application/json" \
   -d '{
@@ -282,8 +188,8 @@ curl -X POST http://localhost:5000/api/v1/devices/register \
     "description": "Living room environmental sensor",
     "device_type": "temperature_sensor",
     "location": "Living Room",
-    "firmware_version": "2.1.4",
-    "hardware_version": "v3.2"
+    "firmware_version": "1.2.3",
+    "hardware_version": "v2.1"
   }'
 ```
 
@@ -297,12 +203,12 @@ curl -X POST http://localhost:5000/api/v1/devices/register \
     "api_key": "rnby0SIR2kF8mN3Q7vX9L1cE6tA5Y4pB",
     "status": "active",
     "device_type": "temperature_sensor",
-    "created_at": "2025-07-03T14:30:00Z"
+    "created_at": "2025-07-02T14:30:00Z"
   }
 }
 ```
 
-### Submit Comprehensive Telemetry Data
+### Submit Telemetry Data
 
 ```bash
 curl -X POST http://localhost:5000/api/v1/devices/telemetry \
@@ -314,89 +220,61 @@ curl -X POST http://localhost:5000/api/v1/devices/telemetry \
       "humidity": 65.2,
       "pressure": 1013.25,
       "battery_level": 87,
-      "signal_strength": -52,
-      "air_quality_index": 42
+      "signal_strength": -52
     },
     "metadata": {
       "location": "Living Room",
-      "sensor_status": "active",
-      "firmware_version": "2.1.4",
-      "calibration_date": "2025-07-01"
+      "sensor_status": "active"
     },
-    "timestamp": "2025-07-03T14:30:00Z"
+    "timestamp": "2025-07-02T14:30:00Z"
   }'
 ```
 
-### Advanced Time-Series Queries
+### Query Telemetry Data
 
 ```bash
-# Get historical data with complex filtering
-curl "http://localhost:5000/api/v1/telemetry/1?start_time=-24h&end_time=-1h&fields=temperature,humidity&limit=500"
+# Get latest telemetry
+curl "http://localhost:5000/api/v1/telemetry/1/latest"
 
-# Get aggregated data with time windows
-curl "http://localhost:5000/api/v1/telemetry/1/aggregated?window=1h&start_time=-7d&aggregation=avg,min,max"
+# Get historical data with filters
+curl "http://localhost:5000/api/v1/telemetry/1?start_time=-1h&limit=100"
 
-# Get data range with specific time bounds
-curl "http://localhost:5000/api/v1/telemetry/1/range?from=2025-07-01T00:00:00Z&to=2025-07-03T23:59:59Z"
+# Get aggregated data (hourly averages)
+curl "http://localhost:5000/api/v1/telemetry/1/aggregated?window=1h&start_time=-24h"
 ```
 
-### Real-Time Device Monitoring
+### Device Heartbeat
 
 ```bash
-# Get live device status
 curl -X POST http://localhost:5000/api/v1/devices/heartbeat \
   -H "X-API-Key: rnby0SIR2kF8mN3Q7vX9L1cE6tA5Y4pB"
-
-# Check comprehensive system health
-curl "http://localhost:5000/health?detailed=true" | python -m json.tool
 ```
 
 ## 🗃️ Data Architecture
 
 ### SQLite Database (Device Management)
 
-**Enhanced Devices Table:**
-- `id` - Primary key (auto-increment)
+**Devices Table:**
+- `id` - Primary key
 - `name` - Unique device identifier  
 - `description` - Device description
 - `device_type` - Category (sensor, actuator, camera, etc.)
 - `api_key` - Unique authentication key (32 chars)
-- `status` - Device status (active, inactive, maintenance, error)
+- `status` - Device status (active, inactive, maintenance)
 - `location` - Physical location
 - `firmware_version` - Current firmware version
 - `hardware_version` - Hardware revision
-- `configuration` - JSON configuration blob
 - `created_at` - Registration timestamp
-- `updated_at` - Last modification timestamp
-- `last_seen` - Last heartbeat/activity timestamp
+- `updated_at` - Last modification
+- `last_seen` - Last heartbeat/activity
 
-### Apache IoTDB (Time-Series Telemetry)
+### IoTDB (Time-Series Telemetry)
 
-**Hierarchical Data Structure:**
-```
-root.iotflow.devices.device_{id}.{measurement}
-```
-
-**Example Time Series:**
-```
-root.iotflow.devices.device_1.temperature
-root.iotflow.devices.device_1.humidity  
-root.iotflow.devices.device_1.pressure
-root.iotflow.devices.device_1.battery_level
-root.iotflow.devices.device_2.temperature
-```
-
-**Data Types Supported:**
-- `INT32`, `INT64` - Integer measurements
-- `FLOAT`, `DOUBLE` - Decimal measurements  
-- `TEXT` - String data and metadata
-- `BOOLEAN` - Status indicators
-
-**Advanced Features:**
-- Automatic data compression
-- Configurable TTL (Time To Live)
-- Multi-level storage groups
-- Built-in aggregation functions
+**Time Series Structure:**
+- **Storage Groups**: `root.iotflow.{device_id}`
+- **Measurements**: Device data fields (temperature, humidity, etc.)
+- **Data Types**: INT32, INT64, FLOAT, DOUBLE, TEXT, BOOLEAN
+- **Timestamp**: Precise time-series indexing
 
 ## 🛠️ Development & Management
 
@@ -412,58 +290,52 @@ IoTFlow_ConnectivityLayer/
 │   ├── routes/                      # API route handlers
 │   │   ├── devices.py              # Device management endpoints
 │   │   ├── telemetry.py            # Telemetry data endpoints
-│   │   ├── admin.py                # Administrative endpoints
-│   │   └── mqtt.py                 # MQTT integration endpoints
+│   │   └── admin.py                # Administrative endpoints
 │   ├── services/                    # Business logic services
-│   │   ├── iotdb.py                # IoTDB service layer
-│   │   └── mqtt_auth.py            # MQTT authentication
+│   │   └── iotdb.py                # IoTDB service layer
 │   ├── middleware/                  # Request/response middleware
 │   │   ├── auth.py                 # Authentication & authorization
 │   │   ├── security.py             # Security utilities
 │   │   └── monitoring.py           # Performance monitoring
 │   └── utils/                       # Utility functions
 │       └── logging.py              # Logging configuration
-├── 📁 simulators/                   # Advanced device simulation
+├── 📁 simulators/                   # Device simulation & testing
 │   ├── basic_device_simulator.py   # Single device simulator
-│   ├── device_types.py             # Specialized device simulators
 │   ├── fleet_simulator.py          # Multi-device fleet simulator
-│   ├── mqtt_device_simulator.py    # MQTT-only device simulator
-│   ├── mqtt_fleet_simulator.py     # MQTT fleet simulator
+│   ├── device_types.py             # Specialized device simulators
 │   └── simulate.py                 # Interactive simulation control
-├── 📁 test/                         # Comprehensive test suites
-│   ├── test_end_to_end.py          # Full system integration tests
-│   ├── test_iotdb_integration.py   # IoTDB-specific tests
-│   └── test_*.py                   # Component-specific tests
-├── 📁 docs/                         # Documentation
-│   ├── iotdb_integration.md        # IoTDB integration guide
-│   └── api_reference.md            # Complete API documentation
+├── 📁 mqtt/                         # MQTT broker configuration
+│   └── config/                     # Mosquitto configuration files
+├── 📁 tests/                        # Test suites (unit & integration)
 ├── 🐳 docker-compose.yml            # Container orchestration
 ├── 🔧 docker-manage.sh              # Docker management script
 ├── 🔧 manage.py                     # Python management script
 ├── 📦 pyproject.toml                # Poetry dependencies
-├── 📄 .env.example                  # Environment configuration template
-└── 📚 README.md                     # This comprehensive guide
+├── 📄 .env                          # Environment configuration
+└── 📚 Documentation/                # Comprehensive docs
+    ├── MANAGEMENT_GUIDE.md         # Management & deployment guide
+    ├── HTTP_SIMULATION_TEST_RESULTS.md  # Testing results
+    └── iotdb_integration.md        # Architecture docs
 ```
 
-### Enhanced Management Commands
+### Management Commands
 
 #### Docker Management Script (`./docker-manage.sh`)
 
 ```bash
-# Complete workflow commands
-./docker-manage.sh start-all     # Start all services (Redis, IoTDB, MQTT)
+# Complete setup workflow
+./docker-manage.sh start-all     # Start all services
 ./docker-manage.sh init-app      # Initialize environment & database
 ./docker-manage.sh run           # Start Flask application
 
 # Development workflow
 ./docker-manage.sh status        # Check service status
-./docker-manage.sh logs          # View all logs
-./docker-manage.sh logs iotdb    # View IoTDB logs specifically
-./docker-manage.sh restart       # Restart all services
+./docker-manage.sh logs          # View logs
+./docker-manage.sh logs iotdb # View specific service logs
 
 # Data management
-./docker-manage.sh backup        # Backup SQLite and IoTDB data
-./docker-manage.sh restore backup_file.tar.gz  # Restore from backup
+./docker-manage.sh backup        # Backup SQLite database
+./docker-manage.sh restore backup_file.db  # Restore from backup
 ./docker-manage.sh reset         # Reset all data (CAUTION!)
 
 # Database connections
@@ -477,47 +349,41 @@ IoTFlow_ConnectivityLayer/
 # Database operations
 poetry run python manage.py init-db                    # Initialize database
 poetry run python manage.py create-device "My Device" # Create test device
-poetry run python manage.py migrate                    # Run database migrations
 
 # Application operations  
 poetry run python manage.py run                        # Start Flask app
 poetry run python manage.py test                       # Run test suite
 poetry run python manage.py shell                      # Interactive Python shell
-poetry run python manage.py create-admin               # Create admin user
 ```
 
-### Advanced Testing & Validation
+### Testing & Simulation
 
 #### Comprehensive Test Suite
 
 ```bash
-# Run all tests with coverage
-poetry run python manage.py test --coverage
+# Run all tests
+poetry run python manage.py test
 
 # Specific test categories
-poetry run pytest test/unit/ -v           # Unit tests
-poetry run pytest test/integration/ -v    # Integration tests
-poetry run pytest test/api/ -v            # API endpoint tests
-poetry run pytest test/iotdb/ -v          # IoTDB-specific tests
-
-# Performance testing
-poetry run python test/performance_test.py --devices 100 --duration 300
+poetry run pytest tests/unit/ -v           # Unit tests
+poetry run pytest tests/integration/ -v    # Integration tests
+poetry run pytest tests/api/ -v            # API endpoint tests
 ```
 
-#### Device Simulation Testing Scenarios
+#### Device Simulation Options
 
 ```bash
-# Interactive testing (recommended for development)
+# Interactive simulation (recommended for development)
 poetry run python simulators/simulate.py --interactive
 
-# Automated test scenarios
-poetry run python simulators/fleet_simulator.py --preset test_suite --duration 60
+# Single device tests
+poetry run python simulators/basic_device_simulator.py --duration 300
+poetry run python simulators/device_types.py --device-type temperature
 
-# Load testing scenarios
-poetry run python simulators/fleet_simulator.py --preset stress_test --duration 300
-
-# Specific device behavior testing
-poetry run python simulators/device_types.py --device-type all --duration 180
+# Fleet simulations for load testing
+poetry run python simulators/fleet_simulator.py --preset home     # 9 devices
+poetry run python simulators/fleet_simulator.py --preset office   # 16 devices
+poetry run python simulators/fleet_simulator.py --preset factory  # 30 devices
 ```
 
 ### Configuration Management
@@ -628,7 +494,7 @@ curl http://localhost:5000/api/v1/admin/dashboard
 
 ## 📊 Performance Benchmarks
 
-### Test Results (Production Environment)
+### Test Results (Local Development)
 
 #### HTTP API Performance
 - **Device Registration**: ~40ms average response time
@@ -648,12 +514,6 @@ curl http://localhost:5000/api/v1/admin/dashboard
 - **Redis**: Sub-millisecond caching responses
 - **Storage**: ~1KB per telemetry record
 
-#### IoTDB-Specific Performance
-- **Query Performance**: 4-200ms for complex time-series queries
-- **Data Compression**: 60-80% storage reduction
-- **Concurrent Connections**: 100+ simultaneous device connections
-- **Time-Series Aggregation**: Real-time windowing functions
-
 ## 🤝 Contributing
 
 ### Development Setup
@@ -669,7 +529,7 @@ poetry install --with dev
 # Set up pre-commit hooks
 poetry run pre-commit install
 
-# Run development environment
+# Run development server
 ./docker-manage.sh start-all
 ./docker-manage.sh init-app
 ./docker-manage.sh run
@@ -686,17 +546,17 @@ poetry run isort src/ simulators/
 poetry run flake8 src/ simulators/
 poetry run mypy src/
 
-# Testing with coverage
-poetry run pytest test/ --cov=src/ --cov-report=html
+# Testing
+poetry run pytest tests/ --cov=src/
 ```
 
 ## 📚 Documentation
 
-- **[IoTDB Integration Guide](docs/iotdb_integration.md)** - Comprehensive IoTDB setup and usage
-- **[API Documentation](docs/api_reference.md)** - Complete API reference
-- **[Simulator Guide](simulators/README.md)** - Device simulation documentation
-- **[Deployment Guide](docs/deployment.md)** - Production deployment guide
-- **[Performance Testing](docs/performance.md)** - Load testing and benchmarks
+- **[Management Guide](MANAGEMENT_GUIDE.md)** - Comprehensive setup and management
+- **[API Documentation](docs/api.md)** - Complete API reference
+- **[Architecture Guide](docs/architecture.md)** - System design and components
+- **[Testing Results](HTTP_SIMULATION_TEST_RESULTS.md)** - Performance and reliability tests
+- **[IoTDB Integration](docs/iotdb_integration.md)** - Time-series database setup
 
 ## 📝 License
 
@@ -722,32 +582,78 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Docker services: `docker-compose logs [service]`
 - System: Check with `./docker-manage.sh logs`
 
-### Performance Optimization
+### Docker Deployment
 
-1. **Database**: Consider sharding for high-volume deployments
-2. **Security**: Implement OAuth2 for production authentication
-3. **Logging**: Configure centralized logging with ELK stack
-4. **Monitoring**: Set up Prometheus + Grafana dashboards
+```dockerfile
+FROM python:3.9-slim
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+COPY . .
+EXPOSE 5000
+
+CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "app:app"]
+```
+
+### Environment Setup for Production
+
+1. **Database**: For production, consider using PostgreSQL or MySQL with connection pooling
+2. **Security**: Change all default passwords and secret keys
+3. **Logging**: Configure centralized logging
+4. **Monitoring**: Set up application monitoring
 5. **SSL**: Enable HTTPS with proper certificates
-6. **Caching**: Use Redis clustering for distributed caching
+6. **Rate Limiting**: Use Redis for distributed rate limiting
 
-## 🎯 Roadmap
+## Troubleshooting
 
-### Upcoming Features
-- [ ] **GraphQL API**: Advanced query capabilities
-- [ ] **WebSocket Streaming**: Real-time data feeds
-- [ ] **Machine Learning**: Anomaly detection and predictive analytics
-- [ ] **Multi-tenancy**: Enterprise-grade isolation
-- [ ] **Advanced Alerting**: Rule-based monitoring and notifications
-- [ ] **Mobile SDK**: Native iOS/Android device libraries
+### Common Issues
 
-### Enterprise Features
-- [ ] **High Availability**: Multi-master deployment
-- [ ] **Geographic Distribution**: Edge computing support
-- [ ] **Advanced Security**: OAuth2, SAML, LDAP integration
-- [ ] **Compliance**: GDPR, HIPAA, SOC2 compliance tools
-- [ ] **Enterprise Support**: 24/7 support and professional services
+1. **Database Connection Failed**
 
----
+   - Check database file permissions and disk space
+   - Verify credentials in `.env`
+   - Ensure database exists
 
-**🎉 Ready for Production! Your comprehensive IoT connectivity layer with Apache IoTDB is ready to scale.**
+2. **API Key Authentication Failed**
+
+   - Verify API key in `X-API-Key` header
+   - Check device is active
+   - Ensure API key hasn't expired
+
+3. **Telemetry Submission Failed**
+   - Validate JSON payload structure
+   - Check rate limiting
+   - Verify device authentication
+
+### Debug Mode
+
+Enable debug mode for development:
+
+```bash
+export FLASK_ENV=development
+export DEBUG=True
+python app.py
+```
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Support
+
+For issues and questions:
+
+1. Check the troubleshooting section
+2. Review the logs in `logs/iotflow.log`
+3. Run the test script: `python test_api.py`
+4. Verify database connectivity
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
