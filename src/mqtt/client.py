@@ -122,10 +122,32 @@ class TelemetryMessageHandler(MQTTMessageHandler):
         """Add a callback for telemetry data"""
         self.telemetry_callbacks.append(callback)
     
+    def can_handle(self, topic: str) -> bool:
+        """
+        Override to handle both iotflow/devices/+/telemetry and
+        iotflow/devices/+/telemetry/+ (with subtopics like 'sensors')
+        """
+        # Split topic into parts
+        topic_parts = topic.split("/")
+        
+        # Must be at least 4 parts (iotflow/devices/device_id/telemetry)
+        if len(topic_parts) < 4:
+            return False
+        
+        # Check the first parts match our pattern
+        if (topic_parts[0] == "iotflow" and 
+            topic_parts[1] == "devices" and 
+            topic_parts[3] == "telemetry"):
+            return True
+            
+        return False
+    
     def handle_message(self, message: MQTTMessage) -> None:
         """
         Process telemetry message with server-side API key authentication
-        Expected payload format: {"api_key": "device_api_key", "data": {...}, "metadata": {...}, "timestamp": "..."}
+        Supports both formats:
+        1. Structured: {"api_key": "key", "data": {...}, "metadata": {...}, "timestamp": "..."}
+        2. Flat: {"api_key": "key", "temperature": 31, "humidity": 44, ...}
         """
         try:
             # Parse topic to extract device info
@@ -134,6 +156,11 @@ class TelemetryMessageHandler(MQTTMessageHandler):
                 self.logger.warning("Invalid telemetry topic format: %s", message.topic)
                 return
             
+            # Log the subtopic if present (like 'sensors')
+            subtopic = topic_parts[4] if len(topic_parts) > 4 else None
+            if subtopic:
+                self.logger.info("Processing telemetry with subtopic: %s", subtopic)
+                
             try:
                 device_id = int(topic_parts[2])
             except ValueError:

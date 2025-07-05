@@ -105,8 +105,19 @@ class MQTTAuthService:
                 f"iotflow/devices/{device_id}/config"
             ]
             
-            return topic in allowed_publish_topics or topic in allowed_subscribe_topics
-            
+            # Check if exact match
+            if topic in allowed_publish_topics or topic in allowed_subscribe_topics:
+                return True
+                
+            # Check for telemetry subtopics (like telemetry/sensors)
+            if topic.startswith(f"iotflow/devices/{device_id}/telemetry/"):
+                return True
+                
+            # Check for status subtopics (like status/online)
+            if topic.startswith(f"iotflow/devices/{device_id}/status/"):
+                return True
+                
+            return False
         except Exception as e:
             logger.error(f"Error checking device authorization: {e}")
             return False
@@ -147,27 +158,57 @@ class MQTTAuthService:
                     logger.warning("Unauthorized telemetry attempt from device_id %d", device_id)
                     return False
                 
-                # Extract telemetry data and metadata
-                telemetry_data = data.get('data', {})
-                metadata = data.get('metadata', {})
-                timestamp_str = data.get('timestamp')
+                # Handle both structured and flat data formats
+                telemetry_data = {}
+                metadata = {}
+                timestamp = None
+                timestamp_str = None
                 
+                # Check if data has the expected structure with 'data' field
+                if 'data' in data:
+                    # Structured format
+                    telemetry_data = data.get('data', {})
+                    metadata = data.get('metadata', {})
+                    timestamp_str = data.get('timestamp')
+                else:
+                    # Flat format (all fields at root level)
+                    # Copy payload data excluding api_key
+                    telemetry_data = {k: v for k, v in data.items() if k != 'api_key'}
+                    
+                    # Look for timestamp in ts or timestamp fields
+                    timestamp_str = data.get('timestamp') or data.get('ts')
+                    
+                    # Include device_type in metadata
+                    metadata = {'device_type': device.device_type}
+                
+                # Check if we have any telemetry data
                 if not telemetry_data:
-                    logger.warning("Empty telemetry data from device %d", device_id)
+                    logger.warning("No telemetry data extracted from message for device %d", device_id)
                     return False
                 
                 # Parse timestamp if provided
-                timestamp = None
                 if timestamp_str:
                     try:
-                        if timestamp_str.endswith('Z'):
-                            timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                        # Try ISO format first
+                        if isinstance(timestamp_str, str) and ('T' in timestamp_str or ':' in timestamp_str):
+                            if timestamp_str.endswith('Z'):
+                                timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                            else:
+                                timestamp = datetime.fromisoformat(timestamp_str)
                         else:
-                            timestamp = datetime.fromisoformat(timestamp_str)
-                    except ValueError:
-                        logger.warning("Invalid timestamp format from device %d: %s", device_id, timestamp_str)
+                            # Handle numeric timestamp (epoch seconds or milliseconds)
+                            ts_val = float(timestamp_str)
+                            if ts_val < 1e10:  # If less than 10 billion, assume seconds
+                                timestamp = datetime.fromtimestamp(ts_val, tz=timezone.utc)
+                            else:  # Assume milliseconds
+                                timestamp = datetime.fromtimestamp(ts_val / 1000, tz=timezone.utc)
+                    except ValueError as e:
+                        logger.warning(f"Invalid timestamp format from device {device_id}: {timestamp_str} - {str(e)}")
                 
-                # Store in IoTDB only
+                # Log what we're processing
+                logger.debug(f"Processing telemetry for device {device_id}: {telemetry_data}")
+                
+                # Store in IoTDB
                 success = self.iotdb_service.write_telemetry_data(
                     device_id=str(device_id),
                     data=telemetry_data,
@@ -187,10 +228,6 @@ class MQTTAuthService:
                     
         except Exception as e:
             logger.error("Error handling telemetry message: %s", e)
-            return False
-                
-        except Exception as e:
-            logger.error(f"Error handling telemetry message: {e}")
             return False
     
     def get_device_credentials(self, device_id: int) -> Optional[Dict[str, str]]:

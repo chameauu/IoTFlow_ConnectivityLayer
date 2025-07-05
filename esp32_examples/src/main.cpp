@@ -20,16 +20,16 @@ and send simulated telemetry data using the correct topic structure and authenti
 DHT dht(DHT_PIN, DHT_TYPE);
 
 // WiFi credentials
-const char* ssid = "Airbox-1534";
-const char* password = "PVJQY46J";
+const char* ssid = "jmal mohamed ali";
+const char* password = "20202021";
 
 // Server settings
-const char* server_host = "192.168.1.109";  // Replace with your server IP
+const char* server_host = "192.168.0.6";  // Replace with your server IP
 const int mqtt_port = 1883;
 const int http_port = 5000;  // Flask server port
 
 // Device configuration
-String device_name = "esp32_101";  // Unique device name
+String device_name = "esp32_001";  // Unique device name
 String device_type = "esp32";
 String firmware_version = "1.0.0";
 String location = "lab";
