@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, current_app
 from src.models import Device, DeviceAuth, DeviceConfiguration, db
 from src.middleware.auth import authenticate_device
 from datetime import datetime, timezone, timedelta
+from src.services.device_status_cache import DEVICE_STATUS_PREFIX, DEVICE_LASTSEEN_PREFIX
 
 # Create blueprint for admin routes
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/v1/admin')
@@ -208,4 +209,122 @@ def delete_device(device_id):
         return jsonify({
             'error': 'Failed to delete device',
             'message': 'An error occurred while deleting the device'
+        }), 500
+
+@admin_bp.route('/cache/device-status', methods=['DELETE'])
+def clear_device_status_cache():
+    """Clear all device status cache data from Redis"""
+    try:
+        # Check if Redis cache is available
+        if not hasattr(current_app, 'device_status_cache') or not current_app.device_status_cache:
+            return jsonify({
+                'status': 'error',
+                'message': 'Device status cache is not available'
+            }), 503
+        
+        # Clear all device caches
+        success = current_app.device_status_cache.clear_all_device_caches()
+        
+        if success:
+            return jsonify({
+                'status': 'success',
+                'message': 'All device status caches cleared successfully'
+            }), 200
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': 'Failed to clear device status caches'
+            }), 500
+            
+    except Exception as e:
+        current_app.logger.error(f"Error clearing device status cache: {str(e)}")
+        return jsonify({
+            'error': 'Cache operation failed',
+            'message': 'An error occurred while clearing the device status cache'
+        }), 500
+
+@admin_bp.route('/cache/devices/<int:device_id>', methods=['DELETE'])
+def clear_device_cache(device_id):
+    """Clear cached data for a specific device"""
+    try:
+        # Check if device exists
+        device = Device.query.filter_by(id=device_id).first()
+        if not device:
+            return jsonify({
+                'error': 'Device not found',
+                'message': f'No device found with ID {device_id}'
+            }), 404
+        
+        # Check if Redis cache is available
+        if not hasattr(current_app, 'device_status_cache') or not current_app.device_status_cache:
+            return jsonify({
+                'status': 'error',
+                'message': 'Device status cache is not available'
+            }), 503
+        
+        # Clear device cache
+        success = current_app.device_status_cache.clear_device_cache(device_id)
+        
+        if success:
+            return jsonify({
+                'status': 'success',
+                'message': f'Cache cleared for device {device_id}'
+            }), 200
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': f'Failed to clear cache for device {device_id}'
+            }), 500
+            
+    except Exception as e:
+        current_app.logger.error(f"Error clearing device cache: {str(e)}")
+        return jsonify({
+            'error': 'Cache operation failed',
+            'message': f'An error occurred while clearing the cache for device {device_id}'
+        }), 500
+
+@admin_bp.route('/cache/device-status', methods=['GET'])
+def get_cache_stats():
+    """Get statistics about the device status cache"""
+    try:
+        # Check if Redis cache is available
+        if not hasattr(current_app, 'device_status_cache') or not current_app.device_status_cache:
+            return jsonify({
+                'status': 'error',
+                'message': 'Device status cache is not available'
+            }), 503
+        
+        # Check if Redis client is available
+        if not current_app.device_status_cache.available:
+            return jsonify({
+                'status': 'error',
+                'message': 'Redis connection is not available'
+            }), 503
+        
+        # Get Redis info
+        redis_client = current_app.device_status_cache.redis
+        
+        # Get all cache keys
+        status_keys = redis_client.keys(f"{DEVICE_STATUS_PREFIX}*")
+        lastseen_keys = redis_client.keys(f"{DEVICE_LASTSEEN_PREFIX}*")
+        
+        # Get Redis info
+        redis_info = redis_client.info()
+        
+        return jsonify({
+            'status': 'success',
+            'cache_stats': {
+                'device_status_count': len(status_keys),
+                'device_lastseen_count': len(lastseen_keys),
+                'redis_memory_used': redis_info.get('used_memory_human', 'unknown'),
+                'redis_uptime': redis_info.get('uptime_in_seconds', 0),
+                'redis_version': redis_info.get('redis_version', 'unknown')
+            }
+        }), 200
+            
+    except Exception as e:
+        current_app.logger.error(f"Error getting cache stats: {str(e)}")
+        return jsonify({
+            'error': 'Cache operation failed',
+            'message': 'An error occurred while getting cache statistics'
         }), 500

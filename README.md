@@ -927,6 +927,7 @@ poetry run pytest tests/ --cov=src/
 - **[Architecture Guide](docs/architecture.md)** - System design and components
 - **[Testing Results](HTTP_SIMULATION_TEST_RESULTS.md)** - Performance and reliability tests
 - **[IoTDB Integration](docs/iotdb_integration.md)** - Time-series database setup
+- **[Device Status Cache](docs/device_status_cache.md)** - Redis-based device status caching
 
 ## ❓ Frequently Asked Questions (FAQ)
 

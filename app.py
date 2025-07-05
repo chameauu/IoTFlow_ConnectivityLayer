@@ -14,6 +14,7 @@ from src.middleware.monitoring import HealthMonitor
 from src.middleware.security import comprehensive_error_handler, security_headers_middleware
 from src.mqtt.client import create_mqtt_service
 from src.services.mqtt_auth import MQTTAuthService
+from src.services.device_status_cache import DeviceStatusCache
 
 def create_app(config_name=None):
     """Application factory pattern"""
@@ -68,8 +69,8 @@ def create_app(config_name=None):
         # Initialize MQTT authentication service with app context
         mqtt_auth_service = MQTTAuthService(app=app)
         
-        # Create MQTT service with authentication
-        mqtt_service = create_mqtt_service(config_obj.mqtt_config, mqtt_auth_service)
+        # Create MQTT service with authentication and app reference for Redis cache
+        mqtt_service = create_mqtt_service(config_obj.mqtt_config, mqtt_auth_service, app)
         app.mqtt_service = mqtt_service
         app.mqtt_auth_service = mqtt_auth_service
         
@@ -88,6 +89,16 @@ def create_app(config_name=None):
         app.logger.error(f"MQTT service initialization failed: {str(e)}")
         app.mqtt_service = None
         app.mqtt_auth_service = None
+    
+    # Initialize Device Status Cache
+    try:
+        # Use Redis client for device status caching
+        device_status_cache = DeviceStatusCache(redis_client=app.redis_client)
+        app.device_status_cache = device_status_cache
+        app.logger.info("Device Status Cache initialized successfully")
+    except Exception as e:
+        app.logger.error(f"Failed to initialize Device Status Cache: {str(e)}")
+        app.device_status_cache = None
     
     # Enhanced health check endpoint
     @app.route('/health', methods=['GET'])

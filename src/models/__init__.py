@@ -55,6 +55,35 @@ class Device(db.Model):
         """Update the last seen timestamp"""
         self.last_seen = datetime.now(timezone.utc)
         db.session.commit()
+        
+        # Also update Redis cache if available
+        from flask import current_app
+        if hasattr(current_app, 'device_status_cache') and current_app.device_status_cache:
+            current_app.device_status_cache.update_device_last_seen(self.id)
+            current_app.device_status_cache.set_device_status(self.id, 'online')
+    
+    def set_status(self, status):
+        """Set device status and update Redis cache"""
+        self.status = status
+        db.session.commit()
+        
+        # Also update Redis cache if available
+        from flask import current_app
+        if hasattr(current_app, 'device_status_cache') and current_app.device_status_cache:
+            current_app.device_status_cache.set_device_status(self.id, status)
+    
+    def get_status(self):
+        """Get device status with Redis cache priority"""
+        from flask import current_app
+        
+        # Try to get from Redis cache first
+        if hasattr(current_app, 'device_status_cache') and current_app.device_status_cache:
+            redis_status = current_app.device_status_cache.get_device_status(self.id)
+            if redis_status:
+                return redis_status
+        
+        # Fall back to database status
+        return self.status
     
     def is_authenticated(self, api_key):
         """Check if the provided API key matches the device's API key"""

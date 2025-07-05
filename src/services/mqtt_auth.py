@@ -42,11 +42,15 @@ class MQTTAuthService:
                     logger.warning("Device not found or inactive for API key: %s...", api_key[:8])
                     return None
                     
-                # Update last seen
+                # Update last seen (this also updates Redis cache via the device model)
                 device.update_last_seen()
                 
                 # Cache authenticated device
                 self.authenticated_devices[device.id] = device
+                
+                # Also update device status in Redis directly
+                if hasattr(self.app, 'device_status_cache') and self.app.device_status_cache:
+                    self.app.device_status_cache.set_device_status(device.id, 'online')
                 
                 logger.info("Device authenticated successfully: %s (ID: %d)", device.name, device.id)
                 return device
@@ -217,9 +221,14 @@ class MQTTAuthService:
                     timestamp=timestamp
                 )
                 
-                if success:
-                    # Update device last seen
+                if success:                # Update device last seen and also update Redis cache
                     device.update_last_seen()
+                
+                # Update device status in Redis cache directly if available
+                if hasattr(self.app, 'device_status_cache') and self.app.device_status_cache:
+                    self.app.device_status_cache.update_device_last_seen(device_id)
+                    self.app.device_status_cache.set_device_status(device_id, 'online')
+                
                     logger.info("Telemetry stored in IoTDB for device %s (ID: %d)", device.name, device_id)
                     return True
                 else:

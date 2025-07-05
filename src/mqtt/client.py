@@ -289,13 +289,18 @@ class StatusMessageHandler(MQTTMessageHandler):
     def __init__(self):
         super().__init__("iotflow/devices/+/status/+")
         self.status_callbacks: List[Callable] = []
+        self.app = None
+        
+    def set_app(self, app):
+        """Set Flask app reference for database operations"""
+        self.app = app
     
     def add_status_callback(self, callback: Callable):
         """Add a callback for status updates"""
         self.status_callbacks.append(callback)
     
     def handle_message(self, message: MQTTMessage) -> None:
-        """Process status message"""
+        """Process status message and update Redis cache"""
         try:
             parsed_topic = MQTTTopicManager.parse_topic(message.topic)
             if not parsed_topic:
@@ -323,6 +328,36 @@ class StatusMessageHandler(MQTTMessageHandler):
                 "topic": message.topic
             }
             
+            # Special handling for online/offline status
+            if status_type in ['online', 'offline', 'connectivity']:
+                # Update device status in Redis cache if app is available
+                if self.app and hasattr(self.app, 'device_status_cache') and self.app.device_status_cache:
+                    # Try to determine online/offline status
+                    device_status = None
+                    
+                    # Check if status is explicitly in the payload
+                    if isinstance(status_data, dict) and 'status' in status_data:
+                        device_status = status_data['status']
+                    # If status is in the topic path
+                    elif status_type in ['online', 'offline']:
+                        device_status = status_type
+                    # If it's a connectivity message with a connection state
+                    elif status_type == 'connectivity' and isinstance(status_data, dict) and 'connected' in status_data:
+                        device_status = 'online' if status_data['connected'] else 'offline'
+                    
+                    # Update Redis cache if we have a status
+                    if device_status and device_id:
+                        try:
+                            device_id_int = int(device_id)
+                            self.app.device_status_cache.set_device_status(device_id_int, device_status)
+                            self.logger.info(f"Updated device {device_id} status in cache: {device_status}")
+                            
+                            # Also update last seen for online devices
+                            if device_status == 'online':
+                                self.app.device_status_cache.update_device_last_seen(device_id_int)
+                        except (ValueError, TypeError) as e:
+                            self.logger.error(f"Error parsing device_id for Redis cache: {e}")
+            
             # Call registered callbacks
             for callback in self.status_callbacks:
                 try:
@@ -342,7 +377,7 @@ class MQTTClientService:
     Handles connections, subscriptions, and message routing
     """
     
-    def __init__(self, config: MQTTConfig, auth_service: MQTTAuthService = None):
+    def __init__(self, config: MQTTConfig, auth_service: MQTTAuthService = None, app=None):
         self.config = config
         self.client = None
         self.connected = False
@@ -351,6 +386,7 @@ class MQTTClientService:
         self.subscription_callbacks: Dict[str, List[Callable]] = {}
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
+        self.app = app
         
         # Initialize authentication service
         self.auth_service = auth_service or MQTTAuthService()
@@ -359,6 +395,10 @@ class MQTTClientService:
         self.telemetry_handler = TelemetryMessageHandler(self.auth_service)
         self.command_handler = CommandMessageHandler()
         self.status_handler = StatusMessageHandler()
+        
+        # Set app reference for handlers that need it
+        if app:
+            self.status_handler.set_app(app)
         
         self.logger.info(f"Initializing MQTT client with telemetry handler: {self.telemetry_handler}")
         self.logger.info(f"Telemetry handler topic pattern: {self.telemetry_handler.topic_pattern}")
@@ -640,28 +680,38 @@ class MQTTClientService:
             
             # Route message to appropriate handlers
             handled = False
+            eligible_handlers = []
+            
+            # First check which handlers can handle the topic
             for handler in self.message_handlers:
-                self.logger.info(f"Checking handler {handler.__class__.__name__} for topic {message.topic}")
                 if handler.can_handle(message.topic):
-                    self.logger.info(f"Handler {handler.__class__.__name__} can handle topic {message.topic}")
-                    handler.handle_message(message)
+                    eligible_handlers.append(handler)
                     handled = True
-                else:
-                    self.logger.info(f"Handler {handler.__class__.__name__} cannot handle topic {message.topic}")
+            
+            # Log the matching handlers
+            if eligible_handlers:
+                handler_names = [h.__class__.__name__ for h in eligible_handlers]
+                self.logger.debug(f"Topic {message.topic} will be processed by: {', '.join(handler_names)}")
+            else:
+                self.logger.warning(f"No handler found for topic: {message.topic}")
+            
+            # Process message with eligible handlers
+            for handler in eligible_handlers:
+                try:
+                    handler.handle_message(message)
+                except Exception as e:
+                    self.logger.error(f"Error in {handler.__class__.__name__} handler: {str(e)}")
             
             # Call topic-specific callbacks
             for topic_pattern, callbacks in self.subscription_callbacks.items():
                 if self._topic_matches_pattern(message.topic, topic_pattern):
-                    self.logger.info(f"Topic {message.topic} matches pattern {topic_pattern}, calling {len(callbacks)} callbacks")
+                    self.logger.debug(f"Topic {message.topic} matches pattern {topic_pattern}, calling {len(callbacks)} callbacks")
                     for callback in callbacks:
                         try:
                             callback(message)
                         except Exception as e:
                             self.logger.error(f"Error in subscription callback: {e}")
             
-            if not handled:
-                self.logger.warning(f"No handler for topic: {message.topic}")
-                
         except Exception as e:
             self.logger.error(f"Error processing received message: {e}")
     
@@ -738,13 +788,14 @@ class MQTTClientService:
 
 
 # Factory function to create MQTT client service
-def create_mqtt_service(config: Dict[str, Any], auth_service: MQTTAuthService = None) -> MQTTClientService:
+def create_mqtt_service(config: Dict[str, Any], auth_service: MQTTAuthService = None, app=None) -> MQTTClientService:
     """
     Factory function to create MQTT client service from configuration
     
     Args:
         config: Configuration dictionary
         auth_service: Optional authentication service
+        app: Flask application instance for accessing Redis cache
         
     Returns:
         Configured MQTT client service
@@ -771,4 +822,4 @@ def create_mqtt_service(config: Dict[str, Any], auth_service: MQTTAuthService = 
         default_qos=config.get("default_qos", 1)
     )
     
-    return MQTTClientService(mqtt_config, auth_service)
+    return MQTTClientService(mqtt_config, auth_service, app)

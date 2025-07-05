@@ -90,16 +90,36 @@ def get_device_status():
         response = device.to_dict()
         response['telemetry_count'] = telemetry_count
         
-        # Handle timezone awareness for last_seen comparison
+        # Check Redis cache for online/offline status first
         is_online = False
-        if device.last_seen:
-            # Ensure both datetimes are timezone-aware for comparison
-            now = datetime.now(timezone.utc)
-            last_seen = device.last_seen
-            if last_seen.tzinfo is None:
-                # If last_seen is naive, assume it's UTC
-                last_seen = last_seen.replace(tzinfo=timezone.utc)
-            is_online = (now - last_seen).total_seconds() < 300  # 5 minutes
+        
+        # Try to get status from Redis cache
+        if hasattr(current_app, 'device_status_cache') and current_app.device_status_cache:
+            cached_status = current_app.device_status_cache.get_device_status(device.id)
+            if cached_status == 'online':
+                is_online = True
+            elif cached_status == 'offline':
+                is_online = False
+            else:
+                # Fall back to database check if not in cache
+                if device.last_seen:
+                    # Ensure both datetimes are timezone-aware for comparison
+                    now = datetime.now(timezone.utc)
+                    last_seen = device.last_seen
+                    if last_seen.tzinfo is None:
+                        # If last_seen is naive, assume it's UTC
+                        last_seen = last_seen.replace(tzinfo=timezone.utc)
+                    is_online = (now - last_seen).total_seconds() < 300  # 5 minutes
+        else:
+            # Fall back to database check if Redis not available
+            if device.last_seen:
+                # Ensure both datetimes are timezone-aware for comparison
+                now = datetime.now(timezone.utc)
+                last_seen = device.last_seen
+                if last_seen.tzinfo is None:
+                    # If last_seen is naive, assume it's UTC
+                    last_seen = last_seen.replace(tzinfo=timezone.utc)
+                is_online = (now - last_seen).total_seconds() < 300  # 5 minutes
         
         response['is_online'] = is_online
         
@@ -435,3 +455,193 @@ def update_device_config():
             'error': 'Failed to update configuration',
             'message': 'An error occurred while updating device configuration'
         }), 500
+
+@device_bp.route('/statuses', methods=['GET'])
+@security_headers_middleware()
+@request_metrics_middleware()
+def get_all_device_statuses():
+    """
+    Get status of all devices using Redis cache for better performance
+    Returns condensed device info with online/offline status for dashboard display
+    """
+    try:
+        # Get optional limit/offset parameters
+        limit = request.args.get('limit', default=100, type=int)
+        offset = request.args.get('offset', default=0, type=int)
+        
+        # Query devices from database
+        devices = Device.query.order_by(Device.id).offset(offset).limit(limit).all()
+        device_statuses = []
+        
+        # Check if Redis cache is available
+        redis_available = (hasattr(current_app, 'device_status_cache') and 
+                           current_app.device_status_cache and 
+                           current_app.device_status_cache.available)
+        
+        for device in devices:
+            # Build condensed device info
+            device_info = {
+                'id': device.id,
+                'name': device.name,
+                'device_type': device.device_type,
+                'status': device.status
+            }
+            
+            # Try to get online/offline status from Redis cache first
+            if redis_available:
+                cached_status = current_app.device_status_cache.get_device_status(device.id)
+                if cached_status:
+                    device_info['is_online'] = (cached_status == 'online')
+                else:
+                    # Fall back to database check if not in cache
+                    device_info['is_online'] = is_device_online(device)
+            else:
+                # Fall back to database check if Redis not available
+                device_info['is_online'] = is_device_online(device)
+            
+            device_statuses.append(device_info)
+        
+        # Return response
+        return jsonify({
+            'status': 'success',
+            'devices': device_statuses,
+            'meta': {
+                'total': Device.query.count(),
+                'limit': limit,
+                'offset': offset,
+                'cache_used': redis_available
+            }
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting device statuses: {str(e)}")
+        return jsonify({
+            'error': 'Status retrieval failed',
+            'message': 'An error occurred while retrieving device statuses'
+        }), 500
+
+@device_bp.route('/<int:device_id>/status', methods=['GET'])
+@security_headers_middleware()
+@request_metrics_middleware()
+def get_device_status_by_id(device_id):
+    """
+    Get status of a specific device using Redis cache for better performance
+    """
+    try:
+        # Get device from database
+        device = Device.query.filter_by(id=device_id).first_or_404()
+        
+        # Build response with basic device info
+        response = {
+            'id': device.id,
+            'name': device.name,
+            'device_type': device.device_type,
+            'status': device.status
+        }
+        
+        # Try to get additional data from Redis cache
+        if hasattr(current_app, 'device_status_cache') and current_app.device_status_cache:
+            # Check if Redis cache is available
+            if current_app.device_status_cache.available:
+                # Get online/offline status from cache, but verify against last_seen time
+                cached_status = current_app.device_status_cache.get_device_status(device.id)
+                
+                # Always check if the device should be online based on last_seen
+                actual_online_status = is_device_online(device)
+                
+                # Use actual status, but record where we initially checked
+                response['is_online'] = actual_online_status
+                if cached_status:
+                    response['status_source'] = 'redis_cache_verified'
+                else:
+                    response['status_source'] = 'database'
+                
+                # Get last seen timestamp from cache
+                last_seen = current_app.device_status_cache.get_device_last_seen(device.id)
+                if last_seen:
+                    response['last_seen'] = last_seen.isoformat()
+                    response['last_seen_source'] = 'redis_cache'
+                else:
+                    response['last_seen'] = device.last_seen.isoformat() if device.last_seen else None
+                    response['last_seen_source'] = 'database'
+            else:
+                # Redis not available
+                response['is_online'] = is_device_online(device)
+                response['last_seen'] = device.last_seen.isoformat() if device.last_seen else None
+                response['status_source'] = 'database'
+                response['last_seen_source'] = 'database'
+        else:
+            # Redis not configured
+            response['is_online'] = is_device_online(device)
+            response['last_seen'] = device.last_seen.isoformat() if device.last_seen else None
+            response['status_source'] = 'database'
+            response['last_seen_source'] = 'database'
+        
+        return jsonify({
+            'status': 'success',
+            'device': response
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting device status for ID {device_id}: {str(e)}")
+        return jsonify({
+            'error': 'Status retrieval failed',
+            'message': f'An error occurred while retrieving status for device {device_id}'
+        }), 500
+
+def is_device_online(device):
+    """
+    Helper function to check if device is online based on last_seen timestamp
+    and update Redis cache if the status has changed
+    """
+    if not device.last_seen:
+        # Device has never been seen
+        sync_device_status_to_redis(device, False)
+        return False
+        
+    # Ensure both datetimes are timezone-aware for comparison
+    now = datetime.now(timezone.utc)
+    last_seen = device.last_seen
+    if last_seen.tzinfo is None:
+        # If last_seen is naive, assume it's UTC
+        last_seen = last_seen.replace(tzinfo=timezone.utc)
+    
+    # Consider device online if last seen in the last 5 minutes
+    time_since_last_seen = (now - last_seen).total_seconds()
+    is_online = time_since_last_seen < 300  # 5 minutes
+    
+    # Update Redis cache if needed
+    sync_device_status_to_redis(device, is_online, time_since_last_seen)
+    
+    return is_online
+
+def sync_device_status_to_redis(device, is_online, time_since_last_seen=None):
+    """
+    Sync the device status to Redis cache if it doesn't match
+    """
+    # Only proceed if Redis cache is available
+    if not hasattr(current_app, 'device_status_cache') or not current_app.device_status_cache:
+        return
+    
+    # Ensure Redis is available
+    if not current_app.device_status_cache.available:
+        return
+        
+    try:
+        # Get current Redis status
+        redis_status = current_app.device_status_cache.get_device_status(device.id)
+        
+        # If status needs updating
+        if (is_online and redis_status != 'online') or (not is_online and redis_status != 'offline'):
+            new_status = 'online' if is_online else 'offline'
+            current_app.device_status_cache.set_device_status(device.id, new_status)
+            
+            if time_since_last_seen is not None:
+                current_app.logger.info(
+                    f"Updated device {device.id} status in Redis: {new_status} " 
+                    f"(last seen {time_since_last_seen:.1f}s ago)"
+                )
+            else:
+                current_app.logger.info(f"Updated device {device.id} status in Redis: {new_status}")
+    except Exception as e:
+        current_app.logger.error(f"Error syncing device {device.id} status to Redis: {e}")
