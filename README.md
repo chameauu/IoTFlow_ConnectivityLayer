@@ -21,7 +21,7 @@ A modern, production-ready IoT platform built with Python Flask for comprehensiv
 - **🐳 Containerized Deployment**: Full Docker Compose development and production environment
 - **📊 Comprehensive Monitoring**: Structured logging, metrics, health checks, and debugging tools
 
-### Recent Improvements (v2.1.0)
+### Recent Improvements (v0.2)
 - **✨ Cleaned up simulator environment** - Removed all legacy simulators, single advanced simulator
 - **🔧 Enhanced device registration** - Smart handling of existing devices, auto-suffix options
 - **📈 Improved error handling** - Better debugging and diagnostic capabilities
@@ -113,7 +113,7 @@ curl http://localhost:5000/health
 
 ## 🎮 Device Simulation & Testing
 
-### 🤖 Advanced MQTT Device Simulator (v2.1.0)
+### 🤖 Advanced MQTT Device Simulator (v0.2)
 
 The platform now includes a single, production-ready MQTT device simulator that replaces all legacy simulators. This advanced simulator provides realistic device behavior with multiple simulation profiles.
 
@@ -836,14 +836,12 @@ curl http://localhost:5000/health?include=iotdb,redis,mqtt
 - **📱 Mobile API**: RESTful API optimizations for mobile apps
 - **🔄 Device Firmware OTA**: Over-the-air firmware updates
 - **🧠 ML Analytics**: Machine learning for predictive maintenance
-- **☁️ Cloud Integration**: AWS IoT Core, Azure IoT Hub connectors
 - **📡 LoRaWAN Support**: Long-range, low-power device connectivity
 - **🔐 OAuth2**: Enterprise authentication integration
 
 ### Architecture Evolution
 - **Microservices**: Service decomposition for scalability
 - **Message Queues**: Apache Kafka integration for high-throughput
-- **Time-series Database**: InfluxDB alternative support
 - **Edge Computing**: Edge device data processing capabilities
 
 ## 🤝 Contributing
