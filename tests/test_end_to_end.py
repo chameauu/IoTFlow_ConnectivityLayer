@@ -335,7 +335,11 @@ class IoTFlowTester:
     def test_admin_device_details(self):
         """Test 11: Get device details via admin endpoint"""
         try:
-            response = self.session.get(f"{self.base_url}/api/v1/admin/devices/{self.test_device_id}")
+            admin_token = os.environ.get("IOTFLOW_ADMIN_TOKEN", "test")
+            headers = {
+            "Authorization": f"admin {admin_token}"
+            }
+            response = self.session.get(f"{self.base_url}/api/v1/admin/devices/{self.test_device_id}",headers=headers)
             
             if response.status_code == 200:
                 data = response.json()

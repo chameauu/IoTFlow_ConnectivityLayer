@@ -2,6 +2,7 @@ from functools import wraps
 from flask import request, jsonify, current_app
 import hashlib
 import time
+import os
 from src.models import Device, DeviceAuth, db
 
 def hash_api_key(api_key):
@@ -169,3 +170,18 @@ def log_request_middleware():
         
         return decorated_function
     return middleware
+
+ADMIN_TOKEN = os.environ.get("IOTFLOW_ADMIN_TOKEN", "changeme_admin_token")
+
+def require_admin_token(f):
+    """Decorator to require a valid admin token for admin endpoints"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("admin "):
+            return jsonify({"error": "Admin token required"}), 401
+        token = auth_header.split(" ", 1)[1]
+        if token != ADMIN_TOKEN:
+            return jsonify({"error": "Invalid admin token"}), 403
+        return f(*args, **kwargs)
+    return decorated_function

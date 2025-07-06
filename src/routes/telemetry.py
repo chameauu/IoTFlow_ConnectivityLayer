@@ -9,6 +9,18 @@ telemetry_bp = Blueprint('telemetry', __name__, url_prefix='/api/v1/telemetry')
 # Initialize IoTDB service
 iotdb_service = IoTDBService()
 
+# Helper to get device by API key and check access
+def get_authenticated_device(device_id=None):
+    api_key = request.headers.get('X-API-Key')
+    if not api_key:
+        return None, jsonify({'error': 'API key required'}), 401
+    device = Device.query.filter_by(api_key=api_key).first()
+    if not device:
+        return None, jsonify({'error': 'Invalid API key'}), 401
+    if device_id is not None and int(device.id) != int(device_id):
+        return None, jsonify({'error': 'Forbidden: device mismatch'}), 403
+    return device, None, None
+
 @telemetry_bp.route('', methods=['POST'])
 def store_telemetry():
     """Store telemetry data in IoTDB"""
@@ -81,30 +93,24 @@ def store_telemetry():
 @telemetry_bp.route('/<int:device_id>', methods=['GET'])
 def get_device_telemetry(device_id):
     """Get telemetry data for a specific device"""
+    device, err, code = get_authenticated_device(device_id)
+    if err:
+        return err, code
     try:
-        # Verify device exists
-        device = Device.query.get_or_404(device_id)
-        
-        # Get query parameters
-        start_time = request.args.get('start_time', '-1h')  # Default to last hour
-        limit = min(int(request.args.get('limit', 1000)), 10000)  # Max 10k records
-        
         telemetry_data = iotdb_service.get_device_telemetry(
             device_id=str(device_id),
-            start_time=start_time,
-            limit=limit
+            start_time=request.args.get('start_time', '-1h'),
+            limit=min(int(request.args.get('limit', 1000)), 10000)
         )
-        
         return jsonify({
             'device_id': device_id,
             'device_name': device.name,
             'device_type': device.device_type,
-            'start_time': start_time,
+            'start_time': request.args.get('start_time', '-1h'),
             'data': telemetry_data,
             'count': len(telemetry_data),
             'iotdb_available': iotdb_service.is_available()
         }), 200
-        
     except Exception as e:
         current_app.logger.error(f"Error getting telemetry: {str(e)}")
         return jsonify({'error': f'Internal server error: {str(e)}'}), 500
@@ -112,12 +118,11 @@ def get_device_telemetry(device_id):
 @telemetry_bp.route('/<int:device_id>/latest', methods=['GET'])
 def get_device_latest_telemetry(device_id):
     """Get the latest telemetry data for a device"""
+    device, err, code = get_authenticated_device(device_id)
+    if err:
+        return err, code
     try:
-        # Verify device exists
-        device = Device.query.get_or_404(device_id)
-        
         latest_data = iotdb_service.get_device_latest_telemetry(str(device_id))
-        
         if latest_data:
             return jsonify({
                 'device_id': device_id,
@@ -133,7 +138,6 @@ def get_device_latest_telemetry(device_id):
                 'message': 'No telemetry data found',
                 'iotdb_available': iotdb_service.is_available()
             }), 404
-            
     except Exception as e:
         current_app.logger.error(f"Error getting latest telemetry: {str(e)}")
         return jsonify({'error': f'Internal server error: {str(e)}'}), 500
@@ -141,23 +145,20 @@ def get_device_latest_telemetry(device_id):
 @telemetry_bp.route('/<int:device_id>/aggregated', methods=['GET'])
 def get_device_aggregated_telemetry(device_id):
     """Get aggregated telemetry data for a device"""
+    device, err, code = get_authenticated_device(device_id)
+    if err:
+        return err, code
     try:
-        # Verify device exists
-        device = Device.query.get_or_404(device_id)
-        
         field = request.args.get('field', 'temperature')
         aggregation = request.args.get('aggregation', 'mean')
         window = request.args.get('window', '1h')
         start_time = request.args.get('start_time', '-24h')
-        
-        # Validate aggregation function
         valid_aggregations = ['mean', 'sum', 'count', 'min', 'max', 'first', 'last', 'median']
         if aggregation not in valid_aggregations:
             return jsonify({
                 'error': 'Invalid aggregation function',
                 'valid_functions': valid_aggregations
             }), 400
-        
         aggregated_data = iotdb_service.get_device_aggregated_data(
             device_id=str(device_id),
             field=field,
@@ -165,7 +166,6 @@ def get_device_aggregated_telemetry(device_id):
             window=window,
             start_time=start_time
         )
-        
         return jsonify({
             'device_id': device_id,
             'device_name': device.name,
@@ -178,7 +178,6 @@ def get_device_aggregated_telemetry(device_id):
             'count': len(aggregated_data),
             'iotdb_available': iotdb_service.is_available()
         }), 200
-        
     except Exception as e:
         current_app.logger.error(f"Error getting aggregated telemetry: {str(e)}")
         return jsonify({'error': f'Internal server error: {str(e)}'}), 500
@@ -186,26 +185,22 @@ def get_device_aggregated_telemetry(device_id):
 @telemetry_bp.route('/<int:device_id>', methods=['DELETE'])
 def delete_device_telemetry(device_id):
     """Delete telemetry data for a device within a time range"""
+    device, err, code = get_authenticated_device(device_id)
+    if err:
+        return err, code
     try:
-        # Verify device exists
-        device = Device.query.get_or_404(device_id)
-        
         data = request.get_json()
         if not data:
             return jsonify({'error': 'Request body required with start_time and stop_time'}), 400
-        
         start_time = data.get('start_time')
         stop_time = data.get('stop_time')
-        
         if not start_time or not stop_time:
             return jsonify({'error': 'start_time and stop_time are required'}), 400
-        
         success = iotdb_service.delete_device_data(
             device_id=str(device_id),
             start_time=start_time,
             stop_time=stop_time
         )
-        
         if success:
             current_app.logger.info(f"Telemetry data deleted for device {device.name} (ID: {device_id})")
             return jsonify({
@@ -219,7 +214,6 @@ def delete_device_telemetry(device_id):
                 'error': 'Failed to delete telemetry data',
                 'message': 'IoTDB may not be available. Check logs for details.'
             }), 500
-            
     except Exception as e:
         current_app.logger.error(f"Error deleting telemetry: {str(e)}")
         return jsonify({'error': f'Internal server error: {str(e)}'}), 500

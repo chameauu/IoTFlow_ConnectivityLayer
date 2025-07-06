@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, current_app
 from src.models import Device, DeviceAuth, DeviceConfiguration, db
-from src.middleware.auth import authenticate_device
+from src.middleware.auth import authenticate_device, require_admin_token
 from datetime import datetime, timezone, timedelta
 from src.services.device_status_cache import DEVICE_STATUS_PREFIX, DEVICE_LASTSEEN_PREFIX
 
@@ -8,6 +8,7 @@ from src.services.device_status_cache import DEVICE_STATUS_PREFIX, DEVICE_LASTSE
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/v1/admin')
 
 @admin_bp.route('/devices', methods=['GET'])
+@require_admin_token
 def list_all_devices():
     """List all devices with basic information"""
     try:
@@ -38,6 +39,7 @@ def list_all_devices():
         }), 500
 
 @admin_bp.route('/devices/<int:device_id>', methods=['GET'])
+@require_admin_token
 def get_device_details(device_id):
     """Get detailed device information including auth and config"""
     try:
@@ -86,6 +88,7 @@ def get_device_details(device_id):
         }), 500
 
 @admin_bp.route('/devices/<int:device_id>/status', methods=['PUT'])
+@require_admin_token
 def update_device_status(device_id):
     """Update device status (active/inactive/maintenance)"""
     try:
@@ -130,6 +133,7 @@ def update_device_status(device_id):
         }), 500
 
 @admin_bp.route('/stats', methods=['GET'])
+@require_admin_token
 def get_system_stats():
     """Get system statistics"""
     try:
@@ -184,6 +188,7 @@ def get_system_stats():
         }), 500
 
 @admin_bp.route('/devices/<int:device_id>', methods=['DELETE'])
+@require_admin_token
 def delete_device(device_id):
     """Delete a device and all related data"""
     try:
@@ -212,6 +217,7 @@ def delete_device(device_id):
         }), 500
 
 @admin_bp.route('/cache/device-status', methods=['DELETE'])
+@require_admin_token
 def clear_device_status_cache():
     """Clear all device status cache data from Redis"""
     try:
@@ -244,6 +250,7 @@ def clear_device_status_cache():
         }), 500
 
 @admin_bp.route('/cache/devices/<int:device_id>', methods=['DELETE'])
+@require_admin_token
 def clear_device_cache(device_id):
     """Clear cached data for a specific device"""
     try:
@@ -284,6 +291,7 @@ def clear_device_cache(device_id):
         }), 500
 
 @admin_bp.route('/cache/device-status', methods=['GET'])
+@require_admin_token
 def get_cache_stats():
     """Get statistics about the device status cache"""
     try:
