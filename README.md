@@ -1129,6 +1129,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**IoTFlow v2.1.0** - A modern, production-ready IoT connectivity platform.
+**IoTFlow v0.2** - A modern, production-ready IoT connectivity platform.
 
 Built with ❤️ for the IoT community.
