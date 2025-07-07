@@ -48,34 +48,7 @@ def create_device(name):
         print(f"API Key: {api_key}")
         print(f"Device ID: {device.id}")
 
-def run_app():
-    """Run the Flask development server"""
-    app = create_app()
-    app.run(host='0.0.0.0', port=5000, debug=True)
 
-def run_tests():
-    """Run tests using pytest"""
-    import subprocess
-    result = subprocess.run(['poetry', 'run', 'pytest', '-v'], capture_output=False)
-    return result.returncode
-
-def run_shell():
-    """Start interactive Python shell with app context"""
-    import code
-    app = create_app()
-    with app.app_context():
-        # Make common objects available in shell
-        from src.models import Device
-        from src.services.iotdb import IoTDBService
-        
-        vars = {
-            'app': app,
-            'db': db,
-            'Device': Device,
-            'iotdb': IoTDBService()
-        }
-        
-        code.interact(local=vars)
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
@@ -91,12 +64,6 @@ if __name__ == '__main__':
             print("Usage: poetry run python manage.py create-device <name>")
             sys.exit(1)
         create_device(sys.argv[2])
-    elif command == 'run':
-        run_app()
-    elif command == 'test':
-        sys.exit(run_tests())
-    elif command == 'shell':
-        run_shell()
     else:
         print(f"Unknown command: {command}")
         print(__doc__)

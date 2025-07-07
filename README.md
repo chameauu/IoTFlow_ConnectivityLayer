@@ -2,6 +2,12 @@
 
 A modern, production-ready IoT platform built with Python Flask for comprehensive device connectivity, telemetry data collection, and real-time analytics. Clean, modernized codebase with advanced MQTT device simulation and robust data storage.
 
+![IoT Platform](https://img.shields.io/badge/Platform-IoT-blue)
+![Python](https://img.shields.io/badge/Python-3.8%2B-green)
+![MQTT](https://img.shields.io/badge/Protocol-MQTT-orange)
+![IoTDB](https://img.shields.io/badge/Database-IoTDB-yellow)
+![Flask](https://img.shields.io/badge/Framework-Flask-lightgrey)
+
 ## 🚀 Features
 
 ### Core Capabilities
@@ -205,6 +211,12 @@ poetry run python scripts/retrieve_iotdb_data.py --device 5 --latest --limit 20
 ```
 ## 📡 API Endpoints
 
+The IoTFlow platform provides a comprehensive API for device management, telemetry data handling, administration, and system monitoring. The APIs follow RESTful principles and use the following authentication mechanisms:
+
+- **No Authentication**: Public endpoints like health checks and device registration
+- **API Key**: Device-specific endpoints requiring the `X-API-Key` header
+- **Admin Token**: Administrative endpoints requiring `Authorization: admin <TOKEN>` header
+
 ### 🔌 Device Management
 
 | Method | Endpoint                    | Description                    | Auth Required |
@@ -213,16 +225,30 @@ poetry run python scripts/retrieve_iotdb_data.py --device 5 --latest --limit 20
 | GET    | `/api/v1/devices/status`   | Get device status & health     | API Key       |
 | POST   | `/api/v1/devices/heartbeat`| Send device heartbeat          | API Key       |
 | PUT    | `/api/v1/devices/config`   | Update device configuration    | API Key       |
+| GET    | `/api/v1/devices/config`   | Get device configuration       | API Key       |
+| GET    | `/api/v1/devices/mqtt-credentials` | Get MQTT connection credentials | API Key |
+| GET    | `/api/v1/devices/statuses` | Get all device statuses        | None          |
 
 ### 📊 Telemetry & Data
 
 | Method | Endpoint                           | Description                    | Auth Required |
 |--------|------------------------------------|--------------------------------|---------------|
-| POST   | `/api/v1/devices/telemetry`       | Submit telemetry data          | API Key       |
-| GET    | `/api/v1/telemetry/{device_id}`   | Get device telemetry history   | None          |
-| GET    | `/api/v1/telemetry/{device_id}/latest` | Get latest telemetry      | None          |
-| GET    | `/api/v1/telemetry/{device_id}/aggregated` | Get aggregated data   | None          |
-| DELETE | `/api/v1/telemetry/{device_id}`   | Delete device telemetry        | Admin         |
+| POST   | `/api/v1/devices/telemetry`       | Submit telemetry data via HTTP  | API Key       |
+| GET    | `/api/v1/devices/telemetry`       | Get device's own telemetry      | API Key       |
+| POST   | `/api/v1/telemetry`               | Submit telemetry data          | API Key       |
+| GET    | `/api/v1/telemetry/{device_id}`   | Get device telemetry history   | API Key*      |
+| GET    | `/api/v1/telemetry/{device_id}/latest` | Get latest telemetry      | API Key*      |
+| GET    | `/api/v1/telemetry/{device_id}/aggregated` | Get aggregated data   | API Key*      |
+| DELETE | `/api/v1/telemetry/{device_id}`   | Delete device telemetry        | API Key*      |
+| GET    | `/api/v1/telemetry/status`        | Get telemetry system status    | None          |
+
+### 📡 MQTT Management
+
+| Method | Endpoint                           | Description                    | Auth Required |
+|--------|------------------------------------|--------------------------------|---------------|
+| GET    | `/api/v1/mqtt/status`             | Get MQTT broker status         | None          |
+| GET    | `/api/v1/mqtt/monitoring/metrics` | Get MQTT monitoring metrics    | None          |
+| POST   | `/api/v1/mqtt/telemetry/{device_id}` | Submit telemetry via MQTT REST proxy | API Key |
 
 ### 🛠️ Administration
 
@@ -232,14 +258,20 @@ poetry run python scripts/retrieve_iotdb_data.py --device 5 --latest --limit 20
 | GET    | `/api/v1/admin/devices/{id}`  | Get device details          | Admin         |
 | PUT    | `/api/v1/admin/devices/{id}`  | Update device               | Admin         |
 | DELETE | `/api/v1/admin/devices/{id}`  | Delete device               | Admin         |
-| GET    | `/api/v1/admin/dashboard`     | Get dashboard statistics    | Admin         |
+| PUT    | `/api/v1/admin/devices/{id}/status` | Update device status  | Admin         |
+| GET    | `/api/v1/admin/stats`         | Get system statistics       | Admin         |
+| GET    | `/api/v1/admin/cache/device-status` | Get device cache stats | Admin        |
+| DELETE | `/api/v1/admin/cache/device-status` | Clear all device cache | Admin        |
+| DELETE | `/api/v1/admin/cache/devices/{id}` | Clear specific device cache | Admin     |
 
 ### 🔍 System Health
 
-| Method | Endpoint              | Description              |
-|--------|-----------------------|--------------------------|
-| GET    | `/health`             | API health check         |
-| GET    | `/api/v1/telemetry/status` | Telemetry system status |
+| Method | Endpoint              | Description              | Auth Required |
+|--------|-----------------------|--------------------------|---------------|
+| GET    | `/health`             | API health check         | None          |
+| GET    | `/api/v1/telemetry/status` | Telemetry system status | None      |
+
+\* API Key required if accessing own device data; Admin token required for other devices
 
 ## 💡 Usage Examples
 
@@ -299,13 +331,19 @@ curl -X POST http://localhost:5000/api/v1/devices/telemetry \
 
 ```bash
 # Get latest telemetry
-curl "http://localhost:5000/api/v1/telemetry/1/latest"
+curl "http://localhost:5000/api/v1/telemetry/1/latest" \
+  -H "X-API-Key: rnby0SIR2kF8mN3Q7vX9L1cE6tA5Y4pB"
 
 # Get historical data with filters
-curl "http://localhost:5000/api/v1/telemetry/1?start_time=-1h&limit=100"
+curl "http://localhost:5000/api/v1/telemetry/1?start_time=-1h&limit=100" \
+  -H "X-API-Key: rnby0SIR2kF8mN3Q7vX9L1cE6tA5Y4pB"
 
 # Get aggregated data (hourly averages)
-curl "http://localhost:5000/api/v1/telemetry/1/aggregated?window=1h&start_time=-24h"
+curl "http://localhost:5000/api/v1/telemetry/1/aggregated?window=1h&start_time=-24h&field=temperature&aggregation=mean" \
+  -H "X-API-Key: rnby0SIR2kF8mN3Q7vX9L1cE6tA5Y4pB"
+
+# Get telemetry system status
+curl "http://localhost:5000/api/v1/telemetry/status"
 ```
 
 ### Device Heartbeat
@@ -315,6 +353,58 @@ curl -X POST http://localhost:5000/api/v1/devices/heartbeat \
   -H "X-API-Key: rnby0SIR2kF8mN3Q7vX9L1cE6tA5Y4pB"
 ```
 
+### MQTT Management
+
+```bash
+# Check MQTT service status
+curl "http://localhost:5000/api/v1/mqtt/status"
+
+# Get MQTT metrics
+curl "http://localhost:5000/api/v1/mqtt/monitoring/metrics"
+
+# Submit telemetry via MQTT REST proxy
+curl -X POST http://localhost:5000/api/v1/mqtt/telemetry/1 \
+  -H "X-API-Key: rnby0SIR2kF8mN3Q7vX9L1cE6tA5Y4pB" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "data": {
+      "temperature": 24.5,
+      "humidity": 62.0
+    },
+    "timestamp": "2025-07-07T10:15:30Z"
+  }'
+```
+
+### Administration APIs
+
+```bash
+# Get admin token from environment (for example purposes)
+ADMIN_TOKEN="test"
+
+# List all devices
+curl "http://localhost:5000/api/v1/admin/devices" \
+  -H "Authorization: admin ${ADMIN_TOKEN}"
+
+# Get detailed device information
+curl "http://localhost:5000/api/v1/admin/devices/1" \
+  -H "Authorization: admin ${ADMIN_TOKEN}"
+
+# Update device status
+curl -X PUT "http://localhost:5000/api/v1/admin/devices/1/status" \
+  -H "Authorization: admin ${ADMIN_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "status": "maintenance"
+  }'
+
+# Get system statistics
+curl "http://localhost:5000/api/v1/admin/stats" \
+  -H "Authorization: admin ${ADMIN_TOKEN}"
+
+# Clear device cache
+curl -X DELETE "http://localhost:5000/api/v1/admin/cache/devices/1" \
+  -H "Authorization: admin ${ADMIN_TOKEN}"
+```
 ## 🗃️ Data Architecture
 
 ### SQLite Database (Device Management)
@@ -556,6 +646,22 @@ curl http://localhost:5000/api/v1/admin/dashboard
 - **Grafana**: Visualization dashboards  
 - **ELK Stack**: Log aggregation and analysis
 - **Alerting**: PagerDuty, Slack integration
+
+### System Health
+
+```bash
+# Basic health check
+curl "http://localhost:5000/health"
+
+# Detailed health check with all components
+curl "http://localhost:5000/health?detailed=true"
+
+# Check specific components
+curl "http://localhost:5000/health?include=iotdb,redis,mqtt"
+
+# Check telemetry system status
+curl "http://localhost:5000/api/v1/telemetry/status"
+```
 
 ## 📊 Performance Benchmarks
 
@@ -1061,10 +1167,20 @@ curl http://localhost:5000/health
 | Purpose | Method | Endpoint | Authentication |
 |---------|--------|----------|----------------|
 | Register device | POST | `/api/v1/devices/register` | None |
-| Submit telemetry | POST | `/api/v1/telemetry` | API Key |
-| Get device data | GET | `/api/v1/telemetry/{device_id}` | None |
-| List devices | GET | `/api/v1/admin/devices` | Admin |
+| Submit telemetry (HTTP) | POST | `/api/v1/devices/telemetry` | API Key |
+| Submit telemetry (REST) | POST | `/api/v1/telemetry` | API Key |
+| Submit telemetry (MQTT) | POST | `/api/v1/mqtt/telemetry/{device_id}` | API Key |
+| Get latest telemetry | GET | `/api/v1/telemetry/{device_id}/latest` | API Key* |
+| Get device history | GET | `/api/v1/telemetry/{device_id}?start_time=-24h&limit=100` | API Key* |
+| Send heartbeat | POST | `/api/v1/devices/heartbeat` | API Key |
+| Get device status | GET | `/api/v1/devices/status` | API Key |
+| Update device config | PUT | `/api/v1/devices/config` | API Key |
+| List all devices | GET | `/api/v1/admin/devices` | Admin |
+| System statistics | GET | `/api/v1/admin/stats` | Admin |
 | Health check | GET | `/health` | None |
+| MQTT status | GET | `/api/v1/mqtt/status` | None |
+
+\* API Key required if accessing own device data; Admin token required for other devices
 
 ### Common Data Formats
 ```bash

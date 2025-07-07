@@ -20,11 +20,11 @@ and send simulated telemetry data using the correct topic structure and authenti
 DHT dht(DHT_PIN, DHT_TYPE);
 
 // WiFi credentials
-const char* ssid = "jmal mohamed ali";
-const char* password = "20202021";
+const char* ssid = "CelluleRech";
+const char* password = "cellrech2023$";
 
 // Server settings
-const char* server_host = "192.168.0.6";  // Replace with your server IP
+const char* server_host = "10.200.240.60";  // Replace with your server IP
 const int mqtt_port = 1883;
 const int http_port = 5000;  // Flask server port
 

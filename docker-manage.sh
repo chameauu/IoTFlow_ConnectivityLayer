@@ -129,14 +129,14 @@ init_app() {
 run_app() {
     log_step "Starting Flask application..."
     check_poetry
-    poetry run python manage.py run
+    poetry run python app.py
 }
 
 # Run tests
 test_app() {
     log_step "Running application tests..."
     check_poetry
-    poetry run python manage.py test
+    poetry run python tests/test_end_to_end.py
 }
 
 # Stop services

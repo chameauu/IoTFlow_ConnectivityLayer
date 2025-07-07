@@ -72,7 +72,7 @@ class AdvancedMQTTDeviceSimulator:
         self.device_status = "initializing"
         
         # Simulation parameters
-        self.telemetry_interval = 30  # seconds
+        self.telemetry_interval = 5  # seconds
         self.heartbeat_interval = 60  # seconds
         self.error_rate = 0.02  # 2% error rate
         self.network_jitter = True
@@ -110,7 +110,7 @@ class AdvancedMQTTDeviceSimulator:
         profiles = {
             "default": {
                 "telemetry_types": ["temperature", "humidity", "pressure", "battery"],
-                "telemetry_interval": 30,
+                "telemetry_interval": 5,
                 "heartbeat_interval": 60,
                 "error_rate": 0.02,
                 "battery_drain_rate": 0.1  # % per hour

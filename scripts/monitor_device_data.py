@@ -79,58 +79,6 @@ class DeviceDataMonitor:
         
         print("-" * 50)
     
-    def check_database_data(self):
-        """Check SQLite database for device data"""
-        if not os.path.exists(DB_PATH):
-            print(f"❌ Database not found at {DB_PATH}")
-            return
-        
-        try:
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            
-            # Check if device exists
-            cursor.execute("SELECT * FROM devices WHERE id = ?", (self.device_id,))
-            device = cursor.fetchone()
-            
-            if device:
-                print(f"✅ Device {self.device_id} found in database")
-                print(f"   Device info: {device}")
-            else:
-                print(f"❌ Device {self.device_id} not found in database")
-                return
-            
-            # Check for telemetry data
-            cursor.execute("""
-                SELECT COUNT(*) FROM telemetry_data 
-                WHERE device_id = ? 
-                AND timestamp > datetime('now', '-1 hour')
-            """, (self.device_id,))
-            
-            recent_count = cursor.fetchone()[0]
-            print(f"📊 Recent telemetry records (last hour): {recent_count}")
-            
-            # Get latest telemetry
-            cursor.execute("""
-                SELECT timestamp, data_type, value, metadata 
-                FROM telemetry_data 
-                WHERE device_id = ? 
-                ORDER BY timestamp DESC 
-                LIMIT 5
-            """, (self.device_id,))
-            
-            latest_data = cursor.fetchall()
-            if latest_data:
-                print("📈 Latest telemetry data:")
-                for row in latest_data:
-                    print(f"   {row[0]} | {row[1]} | {row[2]} | {row[3]}")
-            else:
-                print("❌ No telemetry data found")
-            
-            conn.close()
-            
-        except sqlite3.Error as e:
-            print(f"❌ Database error: {e}")
     
     def start_monitoring(self):
         """Start monitoring MQTT messages"""
@@ -139,9 +87,7 @@ class DeviceDataMonitor:
         print(f"💾 Database: {DB_PATH}")
         print("=" * 60)
         
-        # Check database first
-        self.check_database_data()
-        print("=" * 60)
+        
         
         # Start MQTT monitoring
         try:
