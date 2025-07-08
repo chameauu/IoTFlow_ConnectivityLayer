@@ -1,23 +1,24 @@
 version: "3.8"
 
 services:
-  iotdb:
-    image: apache/iotdb:1.3.0-standalone
-    container_name: iotflow_iotdb
-    ports:
-      - "6667:6667"    # IoTDB client port
-      - "8181:8181"    # IoTDB web interface (if enabled)
-    environment:
-      - IOTDB_CONFIG_DIR=/iotdb/conf
-    volumes:
-      - iotdb_data:/iotdb/data
-      - iotdb_logs:/iotdb/logs
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "timeout 5 bash -c '</dev/tcp/localhost/6667' || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+  # iotdb:
+  #   image: apache/iotdb:1.3.0-standalone
+  #   container_name: iotflow_iotdb
+  #   ports:
+  #     - "6667:6667"    # IoTDB client port
+  #     - "8181:8181"    # IoTDB web interface (if enabled)
+  #   environment:
+  #     - IOTDB_CONFIG_DIR=/iotdb/conf
+  #   volumes:
+  #     - iotdb_data:/iotdb/data
+  #     - iotdb_logs:/iotdb/logs
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "timeout 5 bash -c '</dev/tcp/localhost/6667' || exit 1"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3 
+  #
 
   redis:
     image: redis:7-alpine
@@ -54,10 +55,10 @@ services:
       retries: 3
 
 volumes:
-  iotdb_data:
-    driver: local
-  iotdb_logs:
-    driver: local
+  # iotdb_data:
+  #   driver: local
+  # iotdb_logs:
+  #   driver: local
   redis_data:
     driver: local
   mosquitto_data:
