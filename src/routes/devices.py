@@ -73,7 +73,7 @@ def get_device_status():
     try:
         device = request.device
         
-        # Get telemetry count from IoTDB instead of SQLite
+        # Get telemetry count from IoTDB 
         telemetry_count = 0
         try:
             # Query IoTDB for telemetry count (simplified)
@@ -157,7 +157,7 @@ def submit_telemetry():
                 'message': 'Telemetry data must be a JSON object'
             }), 400
         
-        # Store only in IoTDB (telemetry data should not be in SQLite)
+        # Store only in IoTDB 
         timestamp = datetime.now(timezone.utc)
         
         # Store in IoTDB for time-series analysis

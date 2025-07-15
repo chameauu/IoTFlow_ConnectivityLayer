@@ -8,7 +8,7 @@ from typing import Dict, Any
 import json
 from datetime import datetime
 
-from ..middleware.auth import authenticate_device
+from ..middleware.auth import authenticate_device,require_admin_token
 from ..middleware.monitoring import request_metrics_middleware
 from ..middleware.security import security_headers_middleware, input_sanitization_middleware
 from ..mqtt.topics import MQTTTopicManager
@@ -289,6 +289,7 @@ def validate_topic():
 
 
 @mqtt_bp.route('/device/<device_id>/command', methods=['POST'])
+@require_admin_token
 def send_device_command(device_id: str):
     """Send a command to a specific device via MQTT"""
     try:
@@ -431,6 +432,7 @@ def send_fleet_command(group_id: str):
 
 
 @mqtt_bp.route('/monitoring/metrics', methods=['GET'])
+@require_admin_token
 def get_mqtt_metrics():
     """Get MQTT monitoring metrics (admin only)"""
     try:
