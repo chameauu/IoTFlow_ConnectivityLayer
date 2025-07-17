@@ -1,13 +1,13 @@
 [tool.poetry]
 name = "iot-connectivity-layer"
 version = "0.1.0"
-description = "IoT Device Connectivity Layer with Flask and PostgreSQL"
+description = "IoT Device Connectivity Layer with Flask and IoTDB"
 authors = ["Your Name <your.email@example.com>"]
 readme = "README.md"
 packages = [{include = "src"}]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.12"
 flask = "^2.3.3"
 flask-sqlalchemy = "^3.0.5"
 flask-migrate = "^4.0.5"
