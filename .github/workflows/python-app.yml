@@ -100,7 +100,7 @@ jobs:
         python tests/test_end_to_end.py
     
     - name: Upload test logs
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: test-logs
         path: logs/
