@@ -1,9 +1,10 @@
 from flask import Blueprint, request, jsonify, current_app
-from src.models import Device, DeviceAuth, DeviceConfiguration, db
+from src.models import Device, DeviceAuth, DeviceConfiguration, User, db
 from src.middleware.auth import authenticate_device, validate_json_payload, rate_limit_device
 from src.middleware.monitoring import device_heartbeat_monitor, request_metrics_middleware
 from src.middleware.security import security_headers_middleware, input_sanitization_middleware
 from src.services.iotdb import IoTDBService
+from werkzeug.security import check_password_hash
 from datetime import datetime, timezone
 import json
 
@@ -17,12 +18,30 @@ iotdb_service = IoTDBService()
 @security_headers_middleware()
 @request_metrics_middleware()
 @rate_limit_device(max_requests=10, window=300, per_device=False)  # 10 registrations per 5 minutes per IP
-@validate_json_payload(['name', 'device_type'])
+@validate_json_payload(['name', 'device_type', 'username', 'password'])
 @input_sanitization_middleware()
 def register_device():
-    """Register a new IoT device"""
+    """Register a new IoT device with user authentication"""
     try:
         data = request.validated_json
+        
+        # Verify user credentials
+        username = data['username']
+        password = data['password']
+        
+        user = User.query.filter_by(username=username, is_active=True).first()
+        if not user:
+            return jsonify({
+                'error': 'Authentication failed',
+                'message': 'Invalid username or password'
+            }), 401
+        
+        # Check password
+        if not check_password_hash(user.password_hash, password):
+            return jsonify({
+                'error': 'Authentication failed',
+                'message': 'Invalid username or password'
+            }), 401
         
         # Check if device name already exists
         existing_device = Device.query.filter_by(name=data['name']).first()
@@ -32,23 +51,28 @@ def register_device():
                 'message': 'Please choose a different device name'
             }), 409
         
-        # Create new device
+        # Create new device associated with the authenticated user
         device = Device(
             name=data['name'],
             description=data.get('description', ''),
             device_type=data['device_type'],
             location=data.get('location', ''),
             firmware_version=data.get('firmware_version', ''),
-            hardware_version=data.get('hardware_version', '')
+            hardware_version=data.get('hardware_version', ''),
+            user_id=user.id  # Associate device with authenticated user
         )
         
         db.session.add(device)
         db.session.commit()
         
-        current_app.logger.info(f"New device registered: {device.name} (ID: {device.id})")
+        current_app.logger.info(f"New device registered: {device.name} (ID: {device.id}) by user: {user.username}")
         
         response_data = device.to_dict()
         response_data['api_key'] = device.api_key  # Include API key in registration response
+        response_data['owner'] = {
+            'username': user.username,
+            'email': user.email
+        }
         
         return jsonify({
             'message': 'Device registered successfully',
@@ -80,7 +104,8 @@ def get_device_status():
             telemetry_data = iotdb_service.get_device_telemetry(
                 device_id=str(device.id),
                 start_time='-30d',  # Last 30 days
-                limit=1
+                limit=1,
+                user_id=str(device.user_id) if device.user_id else None
             )
             # This is a simplified count - in practice you might want a proper count query
             telemetry_count = len(telemetry_data) if telemetry_data else 0
@@ -166,7 +191,8 @@ def submit_telemetry():
             data=telemetry_payload,
             device_type=device.device_type,
             metadata=data.get('metadata', {}),
-            timestamp=timestamp
+            timestamp=timestamp,
+            user_id=str(device.user_id) if device.user_id else None
         )
         
         if not iotdb_success:
@@ -215,7 +241,8 @@ def get_telemetry():
             telemetry_data = iotdb_service.get_device_telemetry(
                 device_id=str(device.id),
                 start_time=start_time,
-                limit=limit
+                limit=limit,
+                user_id=str(device.user_id) if device.user_id else None
             )
             
             # Filter by data type if specified (this would need to be implemented in IoTDB service)

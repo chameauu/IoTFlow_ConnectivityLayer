@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import secrets
 import string
 import json
+import uuid
 
 db = SQLAlchemy()
 
@@ -11,9 +12,61 @@ def generate_api_key(length=32):
     alphabet = string.ascii_letters + string.digits
     return ''.join(secrets.choice(alphabet) for _ in range(length))
 
+def generate_user_id():
+    """Generate a unique user ID"""
+    return uuid.uuid4().hex
+
+class User(db.Model):
+    """User model for storing user account information"""
+    __tablename__ = 'users'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.String(32), unique=True, nullable=False, default=generate_user_id)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128), nullable=False)
+    is_active = db.Column(db.Boolean, default=True)
+    is_admin = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    last_login = db.Column(db.DateTime(timezone=True))
+    
+    # Relationships
+    devices = db.relationship('Device', backref='owner', lazy='dynamic')
+    
+    # Indexes
+    __table_args__ = (
+        db.Index('idx_email', 'email'),
+        db.Index('idx_username', 'username'),
+        db.Index('idx_user_id', 'user_id'),
+    )
+    
+    def __repr__(self):
+        return f'<User {self.username}>'
+    
+    def to_dict(self):
+        """Convert user to dictionary"""
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'username': self.username,
+            'email': self.email,
+            'is_active': self.is_active,
+            'is_admin': self.is_admin,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'last_login': self.last_login.isoformat() if self.last_login else None
+        }
+    
+    # Authentication methods can be added here
+
 class Device(db.Model):
     """Device model for storing IoT device information"""
     __tablename__ = 'devices'
+    
+    # Table arguments including indexes
+    __table_args__ = (
+        db.Index('idx_devices_user_id', 'user_id'),
+    )
     
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -27,6 +80,9 @@ class Device(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     last_seen = db.Column(db.DateTime(timezone=True))
+    
+    # Foreign Key Relationship to User
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     
     # Relationships
     auth_records = db.relationship('DeviceAuth', backref='device', lazy='dynamic', cascade='all, delete-orphan')
@@ -46,6 +102,7 @@ class Device(db.Model):
             'location': self.location,
             'firmware_version': self.firmware_version,
             'hardware_version': self.hardware_version,
+            'user_id': self.user_id,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'last_seen': self.last_seen.isoformat() if self.last_seen else None

@@ -241,3 +241,64 @@ def get_telemetry_status():
     except Exception as e:
         current_app.logger.error(f"Error getting telemetry status: {str(e)}")
         return jsonify({'error': f'Internal server error: {str(e)}'}), 500
+
+@telemetry_bp.route('/user/<int:user_id>', methods=['GET'])
+def get_user_telemetry(user_id):
+    """Get telemetry data for all devices belonging to a user"""
+    try:
+        # For now, we'll require authentication via API key from any device owned by the user
+        # In a production system, you might want user-level authentication here
+        api_key = request.headers.get('X-API-Key')
+        if not api_key:
+            return jsonify({'error': 'API key required'}), 401
+        
+        # Find device by API key and verify it belongs to the requested user
+        device = Device.query.filter_by(api_key=api_key).first()
+        if not device:
+            return jsonify({'error': 'Invalid API key'}), 401
+        
+        if device.user_id != user_id:
+            return jsonify({'error': 'Forbidden: user mismatch'}), 403
+        
+        # Parse query parameters
+        limit = min(int(request.args.get('limit', 100)), 1000)  # Max 1000 records
+        start_time = request.args.get('start_time', '-24h')  # Default to last 24 hours
+        end_time = request.args.get('end_time')
+        
+        # Get telemetry data from IoTDB for all user's devices
+        try:
+            telemetry_data = iotdb_service.get_user_telemetry(
+                user_id=str(user_id),
+                start_time=start_time,
+                end_time=end_time,
+                limit=limit
+            )
+            
+            # Get telemetry count for the user
+            telemetry_count = iotdb_service.get_user_telemetry_count(
+                user_id=str(user_id),
+                start_time=start_time
+            )
+            
+        except Exception as e:
+            current_app.logger.error(f"Error querying user telemetry from IoTDB: {str(e)}")
+            telemetry_data = []
+            telemetry_count = 0
+        
+        return jsonify({
+            'status': 'success',
+            'user_id': user_id,
+            'telemetry': telemetry_data,
+            'count': len(telemetry_data),
+            'total_count': telemetry_count,
+            'limit': limit,
+            'start_time': start_time,
+            'end_time': end_time
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"Error retrieving user telemetry: {str(e)}")
+        return jsonify({
+            'error': 'Telemetry retrieval failed',
+            'message': 'An error occurred while retrieving user telemetry data'
+        }), 500

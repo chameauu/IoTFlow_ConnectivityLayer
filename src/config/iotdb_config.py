@@ -67,9 +67,17 @@ class IoTDBConfig:
         except Exception:
             return False
     
-    def get_device_path(self, device_id: str) -> str:
-        """Get the device path for a given device ID"""
-        return f"{self.device_path_template}.device_{device_id}"
+    def get_device_path(self, device_id: str, user_id: str = None) -> str:
+        """Get the device path for a given device ID, optionally organized by user"""
+        if user_id:
+            return f"{self.database}.users.user_{user_id}.devices.device_{device_id}"
+        else:
+            # Fallback to old structure for backward compatibility
+            return f"{self.device_path_template}.device_{device_id}"
+    
+    def get_user_devices_path(self, user_id: str) -> str:
+        """Get the path for all devices belonging to a user"""
+        return f"{self.database}.users.user_{user_id}.devices"
     
     def close(self):
         """Close the IoTDB session"""

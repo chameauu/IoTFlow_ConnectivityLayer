@@ -65,11 +65,11 @@ class IoTDBService:
 
     def write_telemetry_data(self, device_id: str, data: Dict[str, Any], 
                            device_type: str = "sensor", metadata: Dict[str, Any] = None,
-                           timestamp: Optional[datetime] = None) -> bool:
+                           timestamp: Optional[datetime] = None, user_id: str = None) -> bool:
         """
-        Write telemetry data to IoTDB
+        Write telemetry data to IoTDB with user-based organization
         """
-        logger.debug(f"Writing telemetry data - device_id={device_id}, data={data}, metadata={metadata}")
+        logger.debug(f"Writing telemetry data - device_id={device_id}, user_id={user_id}, data={data}, metadata={metadata}")
         
         if not self.is_available():
             logger.warning("IoTDB is not available")
@@ -83,18 +83,20 @@ class IoTDBService:
             timestamp_ms = int(timestamp.timestamp() * 1000)
             logger.debug(f"Using timestamp: {timestamp} ({timestamp_ms}ms)")
             
-            # Get device path
-            device_path = iotdb_config.get_device_path(device_id)
+            # Get device path with user organization
+            device_path = iotdb_config.get_device_path(device_id, user_id)
             
-            # Add device_type to metadata
+            # Add device_type and user_id to metadata
             if metadata is None:
                 metadata = {}
             metadata['device_type'] = device_type
+            if user_id:
+                metadata['user_id'] = user_id
             
             # Prepare time series
             measurements, data_types, values = self._prepare_time_series(device_path, data, metadata)
             
-            logger.debug(f"Prepared {len(measurements)} measurements for device {device_id}")
+            logger.debug(f"Prepared {len(measurements)} measurements for device {device_id} (user: {user_id})")
             
             # Create time series if they don't exist
             for i, measurement in enumerate(measurements):
@@ -118,7 +120,7 @@ class IoTDBService:
                 [str(v) for v in values]  # Convert all values to strings
             )
             
-            logger.info(f"Successfully wrote telemetry data for device {device_id}")
+            logger.info(f"Successfully wrote telemetry data for device {device_id} (user: {user_id})")
             return True
             
         except Exception as e:
@@ -126,18 +128,18 @@ class IoTDBService:
             return False
 
     def get_device_telemetry(self, device_id: str, start_time: str = None, 
-                           end_time: str = None, limit: int = 100) -> List[Dict[str, Any]]:
+                           end_time: str = None, limit: int = 100, user_id: str = None) -> List[Dict[str, Any]]:
         """
-        Query telemetry data from IoTDB
+        Query telemetry data from IoTDB with user-based organization
         """
-        logger.debug(f"Querying telemetry data - device_id={device_id}, limit={limit}")
+        logger.debug(f"Querying telemetry data - device_id={device_id}, user_id={user_id}, limit={limit}")
         
         if not self.is_available():
             logger.warning("IoTDB is not available")
             return []
         
         try:
-            device_path = iotdb_config.get_device_path(device_id)
+            device_path = iotdb_config.get_device_path(device_id, user_id)
             
             # Build query
             query = f"SELECT * FROM {device_path}"
@@ -425,3 +427,193 @@ class IoTDBService:
         except Exception as e:
             logger.error(f"Error getting latest telemetry from IoTDB: {str(e)}")
             return {}
+
+    def get_user_telemetry(self, user_id: str, start_time: str = None, 
+                          end_time: str = None, limit: int = 100) -> List[Dict[str, Any]]:
+        """
+        Query telemetry data for all devices belonging to a user
+        """
+        logger.debug(f"Querying user telemetry data - user_id={user_id}, limit={limit}")
+        
+        if not self.is_available():
+            logger.warning("IoTDB is not available")
+            return []
+        
+        try:
+            user_devices_path = iotdb_config.get_user_devices_path(user_id)
+            
+            # Build query for all devices under the user
+            query = f"SELECT * FROM {user_devices_path}.**"
+            
+            # Add time constraints if provided
+            where_conditions = []
+            if start_time:
+                if start_time.startswith('-'):
+                    # Relative time (e.g., "-1h", "-30d")
+                    now = datetime.now(timezone.utc)
+                    if 'h' in start_time:
+                        hours = int(start_time.replace('-', '').replace('h', ''))
+                        start_timestamp = int((now.timestamp() - hours * 3600) * 1000)
+                    elif 'd' in start_time:
+                        days = int(start_time.replace('-', '').replace('d', ''))
+                        start_timestamp = int((now.timestamp() - days * 24 * 3600) * 1000)
+                    else:
+                        start_timestamp = int((now.timestamp() - 3600) * 1000)  # Default 1 hour
+                    where_conditions.append(f"time >= {start_timestamp}")
+                else:
+                    # Absolute time
+                    start_timestamp = int(datetime.fromisoformat(start_time.replace('Z', '+00:00')).timestamp() * 1000)
+                    where_conditions.append(f"time >= {start_timestamp}")
+            
+            if end_time:
+                end_timestamp = int(datetime.fromisoformat(end_time.replace('Z', '+00:00')).timestamp() * 1000)
+                where_conditions.append(f"time <= {end_timestamp}")
+            
+            if where_conditions:
+                query += " WHERE " + " AND ".join(where_conditions)
+            
+            # Add limit
+            query += f" ORDER BY time DESC LIMIT {limit}"
+            
+            logger.debug(f"Executing user telemetry query: {query}")
+            
+            # Execute query
+            session_data_set = self.session.execute_query_statement(query)
+            
+            # Process results
+            results = []
+            column_names = session_data_set.get_column_names()
+            
+            while session_data_set.has_next():
+                record = session_data_set.next()
+                
+                # Create result record
+                result_record = {
+                    "timestamp": datetime.fromtimestamp(record.get_timestamp() / 1000, tz=timezone.utc).isoformat(),
+                    "user_id": user_id,
+                }
+                
+                # Extract device_id from column names
+                device_id = None
+                for column_name in column_names:
+                    if "device_" in column_name:
+                        # Extract device ID from path like "root.iotflow.users.user_123.devices.device_456.temperature"
+                        path_parts = column_name.split('.')
+                        for part in path_parts:
+                            if part.startswith('device_'):
+                                device_id = part.replace('device_', '')
+                                break
+                        break
+                
+                if device_id:
+                    result_record["device_id"] = device_id
+                
+                # Add field values
+                fields = record.get_fields()
+                for i, column_name in enumerate(column_names):
+                    if column_name != "Time":  # Skip time column
+                        field_name = column_name.split('.')[-1]  # Extract field name from full path
+                        field_index = i - 1  # -1 because Time is first column
+                        
+                        if field_index < len(fields):
+                            field_obj = fields[field_index]
+                            
+                            # Extract the actual value from the Field object
+                            if hasattr(field_obj, 'get_value'):
+                                field_value = field_obj.get_value()
+                            elif hasattr(field_obj, 'value'):
+                                field_value = field_obj.value
+                            else:
+                                field_value = str(field_obj)
+                            
+                            # Handle bytes values
+                            if isinstance(field_value, bytes):
+                                try:
+                                    field_value = field_value.decode('utf-8')
+                                except:
+                                    field_value = str(field_value)
+                            
+                            # Handle NaN and special types
+                            if str(type(field_value).__name__) == 'NAType' or field_value is None:
+                                field_value = None
+                            elif hasattr(field_value, 'is_nan') and field_value.is_nan():
+                                field_value = None
+                            elif str(field_value) == 'nan':
+                                field_value = None
+                            
+                            # Try to parse JSON for complex types
+                            if isinstance(field_value, str):
+                                try:
+                                    field_value = json.loads(field_value)
+                                except:
+                                    pass  # Keep as string if not valid JSON
+                            
+                            result_record[field_name] = field_value
+                
+                results.append(result_record)
+            
+            session_data_set.close_operation_handle()
+            
+            logger.info(f"Retrieved {len(results)} telemetry records for user {user_id}")
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error querying user telemetry data from IoTDB: {str(e)}")
+            return []
+
+    def get_user_telemetry_count(self, user_id: str, start_time: str = None) -> int:
+        """
+        Get count of telemetry records for all devices belonging to a user
+        """
+        logger.debug(f"Getting user telemetry count - user_id={user_id}")
+        
+        if not self.is_available():
+            logger.warning("IoTDB is not available")
+            return 0
+        
+        try:
+            user_devices_path = iotdb_config.get_user_devices_path(user_id)
+            
+            # Build count query for all devices under the user
+            query = f"SELECT count(*) FROM {user_devices_path}.**"
+            
+            if start_time:
+                if start_time.startswith('-'):
+                    # Relative time
+                    now = datetime.now(timezone.utc)
+                    if 'h' in start_time:
+                        hours = int(start_time.replace('-', '').replace('h', ''))
+                        start_timestamp = int((now.timestamp() - hours * 3600) * 1000)
+                    elif 'd' in start_time:
+                        days = int(start_time.replace('-', '').replace('d', ''))
+                        start_timestamp = int((now.timestamp() - days * 24 * 3600) * 1000)
+                    else:
+                        start_timestamp = int((now.timestamp() - 3600) * 1000)
+                    query += f" WHERE time >= {start_timestamp}"
+            
+            logger.debug(f"Executing user count query: {query}")
+            
+            # Execute query
+            session_data_set = self.session.execute_query_statement(query)
+            
+            count = 0
+            if session_data_set.has_next():
+                record = session_data_set.next()
+                fields = record.get_fields()
+                if fields:
+                    count_field = fields[0]
+                    if hasattr(count_field, 'get_value'):
+                        count = count_field.get_value()
+                    elif hasattr(count_field, 'value'):
+                        count = count_field.value
+                    else:
+                        count = int(str(count_field))
+            
+            session_data_set.close_operation_handle()
+            
+            logger.info(f"User {user_id} has {count} telemetry records")
+            return count
+            
+        except Exception as e:
+            logger.error(f"Error getting user telemetry count from IoTDB: {str(e)}")
+            return 0

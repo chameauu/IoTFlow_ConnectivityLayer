@@ -13,7 +13,8 @@ project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
 from app import create_app
-from src.models import db, Device
+from src.models import db, User, Device, DeviceAuth, DeviceConfiguration
+from werkzeug.security import generate_password_hash
 from sqlalchemy import text
 
 def init_database():
@@ -31,6 +32,19 @@ def init_database():
             print("Creating database tables...")
             db.create_all()
             
+            # Create admin user
+            print("Creating admin user...")
+            admin_user = User(
+                username="admin",
+                email="admin@iotflow.local",
+                password_hash=generate_password_hash("admin123"),  # Change in production
+                is_admin=True
+            )
+            db.session.add(admin_user)
+            db.session.flush()  # Flush to get the ID
+            
+            print(f"  - Created admin user: {admin_user.username}")
+            
             # Create sample devices for testing
             print("Creating sample devices...")
             
@@ -41,7 +55,8 @@ def init_database():
                     'device_type': 'sensor',
                     'location': 'Living Room',
                     'firmware_version': '1.2.3',
-                    'hardware_version': 'v2.1'
+                    'hardware_version': 'v2.1',
+                    'user_id': admin_user.id  # Associate with admin user
                 },
                 {
                     'name': 'Smart Door Lock',
@@ -49,7 +64,8 @@ def init_database():
                     'device_type': 'actuator',
                     'location': 'Front Door',
                     'firmware_version': '2.0.1',
-                    'hardware_version': 'v1.0'
+                    'hardware_version': 'v1.0',
+                    'user_id': admin_user.id  # Associate with admin user
                 },
                 {
                     'name': 'Security Camera 01',
@@ -57,7 +73,8 @@ def init_database():
                     'device_type': 'camera',
                     'location': 'Front Yard',
                     'firmware_version': '3.1.0',
-                    'hardware_version': 'v3.2'
+                    'hardware_version': 'v3.2',
+                    'user_id': admin_user.id  # Associate with admin user
                 }
             ]
             
@@ -71,7 +88,16 @@ def init_database():
             print(f"\nDatabase initialization completed successfully!")
             print(f"Created {len(sample_devices)} sample devices.")
             
-            # Display API keys for testing
+            # Display admin user credentials for testing
+            print("\n" + "="*60)
+            print("ADMIN USER CREDENTIALS:")
+            print("="*60)
+            
+            admin = User.query.filter_by(username="admin").first()
+            print(f"Username: {admin.username}")
+            print(f"Email: {admin.email}")
+            print(f"Password: admin123 (change this in production)")
+            
             print("\n" + "="*60)
             print("SAMPLE DEVICE API KEYS FOR TESTING:")
             print("="*60)
@@ -79,6 +105,7 @@ def init_database():
             devices = Device.query.all()
             for device in devices:
                 print(f"Device: {device.name}")
+                print(f"Owner ID: {device.user_id}")
                 print(f"API Key: {device.api_key}")
                 print("-" * 40)
             

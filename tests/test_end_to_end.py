@@ -79,7 +79,9 @@ class IoTFlowTester:
                 "description": "End-to-end test device",
                 "location": "Test Lab",
                 "firmware_version": "1.0.0",
-                "hardware_version": "v1.0"
+                "hardware_version": "v1.0",
+                "username": "admin",
+                "password": "admin123"
             }
             
             response = self.session.post(
@@ -186,7 +188,7 @@ class IoTFlowTester:
             }
             
             response = self.session.post(
-                f"{self.base_url}/api/v1/telemetry",
+                f"{self.base_url}/api/v1/devices/telemetry",
                 headers=headers,
                 json=telemetry_payload
             )

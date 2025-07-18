@@ -124,7 +124,7 @@ jobs:
     - name: Initialize database
       run: |
         echo "Initializing database..."
-        python init_db.py
+        echo "y" | python init_db.py
     
     - name: Start application in background
       run: |

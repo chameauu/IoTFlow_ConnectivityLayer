@@ -496,6 +496,8 @@ bool register_device_with_server() {
   doc["name"] = device_name;
   doc["device_type"] = device_type;
   doc["description"] = "ESP32 IoT device with DHT11 temperature and humidity sensor";
+  doc["username"]="admin"
+  doc["password"]="admin123"
   doc["location"] = location;
   doc["firmware_version"] = firmware_version;
   doc["hardware_version"] = "ESP32-WROOM-32";
