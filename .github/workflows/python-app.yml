@@ -25,8 +25,18 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+      mqtt:
+        image: eclipse-mosquitto:2.0
+        ports:
+          - 1883:1883
+        options: >-
+          --health-cmd "timeout 5 bash -c '</dev/tcp/localhost/1883' || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
       iotdb:
-        image: apache/iotdb:2.0.4-standalone
+        image: apache/iotdb:2.0.3-standalone
         ports:
           - 6667:6667
           - 31999:31999
@@ -42,15 +52,7 @@ jobs:
           --health-retries 20
           --memory 2g
 
-      mqtt:
-        image: eclipse-mosquitto:2.0
-        ports:
-          - 1883:1883
-        options: >-
-          --health-cmd "timeout 5 bash -c '</dev/tcp/localhost/1883' || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+      
 
     steps:
     - uses: actions/checkout@v4
@@ -100,11 +102,6 @@ jobs:
         IOTFLOW_ADMIN_TOKEN=test_token
         EOL
 
-    - name: Install tools for debugging
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y netcat-openbsd curl jq
-
     - name: Wait for services
       run: |
         echo "Waiting for services to be ready..."
@@ -115,19 +112,11 @@ jobs:
         
         # Check IoTDB (more thorough check)
         echo "Checking IoTDB..."
-        echo "Allowing more time for IoTDB initialization..."
-        # More generous timeout for IoTDB (up to 2 minutes)
-        timeout 120 bash -c 'until nc -z localhost 6667; do echo "Waiting for IoTDB..."; sleep 5; done'
-        echo "Port 6667 is now open, waiting 15s more for full IoTDB startup..."
-        sleep 15  # Give IoTDB more time to fully initialize after port is open
-        
+        timeout 90 bash -c 'until nc -z localhost 6667; do echo "Waiting for IoTDB..."; sleep 5; done'
         # List running Docker containers to debug
-        echo "Running containers:"
-        docker ps -a
-        
+        docker ps
         # Check IoTDB logs for any errors
-        echo "IoTDB container logs:"
-        docker logs $(docker ps -a | grep iotdb | awk '{print $1}') 2>&1 | tail -n 100
+        docker logs $(docker ps | grep iotdb | awk '{print $1}') 2>&1 | tail -n 50
         
         # Check MQTT
         echo "Checking MQTT..."
@@ -139,11 +128,6 @@ jobs:
         pip install flake8 black
         flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics
         black --check src/
-
-    - name: Verify IoTDB connection
-      run: |
-        chmod +x .github/workflows/verify-iotdb.sh
-        ./.github/workflows/verify-iotdb.sh
 
     - name: Initialize database
       run: |
