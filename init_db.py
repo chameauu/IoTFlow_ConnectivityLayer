@@ -43,6 +43,15 @@ def init_database():
             db.session.add(admin_user)
             db.session.flush()  # Flush to get the ID
             
+            test_user = User(
+                username="test",
+                email="test@iotflow.local",
+                password_hash=generate_password_hash("test123"),  # Change in production
+                is_admin=False
+            )
+            db.session.add(test_user)
+            db.session.flush()  # Flush to get the ID
+            
             print(f"  - Created admin user: {admin_user.username}")
             
             # Create sample devices for testing

@@ -18,29 +18,21 @@ iotdb_service = IoTDBService()
 @security_headers_middleware()
 @request_metrics_middleware()
 @rate_limit_device(max_requests=10, window=300, per_device=False)  # 10 registrations per 5 minutes per IP
-@validate_json_payload(['name', 'device_type', 'username', 'password'])
+@validate_json_payload(['name', 'device_type', 'user_id'])
 @input_sanitization_middleware()
 def register_device():
-    """Register a new IoT device with user authentication"""
+    """Register a new IoT device with user_id authentication"""
     try:
         data = request.validated_json
         
-        # Verify user credentials
-        username = data['username']
-        password = data['password']
+        # Verify user by user_id
+        user_id = data['user_id']
         
-        user = User.query.filter_by(username=username, is_active=True).first()
+        user = User.query.filter_by(user_id=user_id, is_active=True).first()
         if not user:
             return jsonify({
                 'error': 'Authentication failed',
-                'message': 'Invalid username or password'
-            }), 401
-        
-        # Check password
-        if not check_password_hash(user.password_hash, password):
-            return jsonify({
-                'error': 'Authentication failed',
-                'message': 'Invalid username or password'
+                'message': 'Invalid user_id or user is not active'
             }), 401
         
         # Check if device name already exists

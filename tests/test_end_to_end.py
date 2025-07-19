@@ -80,8 +80,8 @@ class IoTFlowTester:
                 "location": "Test Lab",
                 "firmware_version": "1.0.0",
                 "hardware_version": "v1.0",
-                "username": "admin",
-                "password": "admin123"
+                "username": "test",
+                "password": "test123"
             }
             
             response = self.session.post(

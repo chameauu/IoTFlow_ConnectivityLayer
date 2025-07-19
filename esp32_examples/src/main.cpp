@@ -24,7 +24,7 @@ const char* ssid = "CelluleRech";
 const char* password = "cellrech2023$";
 
 // Server settings
-const char* server_host = "10.200.240.60";  // Replace with your server IP
+const char* server_host = "10.200.240.128";  // Replace with your server IP
 const int mqtt_port = 1883;
 const int http_port = 5000;  // Flask server port
 
@@ -496,8 +496,8 @@ bool register_device_with_server() {
   doc["name"] = device_name;
   doc["device_type"] = device_type;
   doc["description"] = "ESP32 IoT device with DHT11 temperature and humidity sensor";
-  doc["username"]="admin"
-  doc["password"]="admin123"
+  doc["username"]="admin";
+  doc["password"]="admin123";
   doc["location"] = location;
   doc["firmware_version"] = firmware_version;
   doc["hardware_version"] = "ESP32-WROOM-32";
